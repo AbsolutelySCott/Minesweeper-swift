@@ -1,5 +1,9 @@
 import SwiftUI
 
+/// The visual presentation of one board cell, plus its VoiceOver actions.
+/// Touch input is handled once for the whole board by `BoardInteractionLayer`;
+/// keeping gestures out of these 480 views is important for large-board
+/// scrolling performance.
 struct TileView: View {
     let cell: Cell
     let row: Int
@@ -7,11 +11,8 @@ struct TileView: View {
     let side: CGFloat
     let isGameActive: Bool
     let isFlagMode: Bool
-    let onPrimaryAction: () -> Void
-    let onSecondaryAction: () -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var suppressNextTap = false
+    let onAccessibilityActivate: () -> Void
+    let onAccessibilityAlternate: () -> Void
 
     private var cornerRadius: CGFloat {
         min(9, max(2.5, side * 0.17))
@@ -21,100 +22,33 @@ struct TileView: View {
         min(30, max(10, side * 0.54))
     }
 
+    private var tileShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    /// Small tiles are dense and numerous; skip costly bevels and shadows on
+    /// intermediate/expert boards while keeping the richer look for beginner.
+    private var usesRichEffects: Bool {
+        side >= 30
+    }
+
     var body: some View {
-        Button(action: handleTap) {
-            face
-                .frame(width: side, height: side)
-                .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        }
-        .buttonStyle(TilePressStyle(isEnabled: isGameActive, reduceMotion: reduceMotion))
-        .highPriorityGesture(
-            LongPressGesture(minimumDuration: 0.34, maximumDistance: 12)
-                .onEnded { _ in
-                    handleLongPress()
-                }
-        )
-        .accessibilityIdentifier("tile-\(row)-\(column)")
-        .accessibilityLabel("第 \(row + 1) 行第 \(column + 1) 列")
-        .accessibilityValue(accessibilityValue)
-        .accessibilityHint(accessibilityHint)
-        .accessibilityAction(named: Text(secondaryActionName)) {
-            guard isGameActive else { return }
-            onSecondaryAction()
-        }
-    }
-
-    private func handleTap() {
-        guard isGameActive else { return }
-        if suppressNextTap {
-            suppressNextTap = false
-            return
-        }
-
-        if cell.isRevealed {
-            // A revealed number is always useful for chording, including in
-            // flag mode where a plain tap normally places flags.
-            performReveal()
-        } else if cell.isFlagged {
-            performFlag()
-        } else if isFlagMode {
-            performFlag()
-        } else {
-            performReveal()
-        }
-    }
-
-    private func handleLongPress() {
-        guard isGameActive else { return }
-        suppressNextTap = true
-
-        if cell.isRevealed {
-            performReveal()
-        } else if cell.isFlagged {
-            performFlag()
-        } else if isFlagMode {
-            performReveal()
-        } else {
-            performFlag()
-        }
-
-        // If the button canceled its action after the long press, make sure a
-        // later, unrelated tap is not swallowed.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            suppressNextTap = false
-        }
-    }
-
-    private func performReveal() {
-        if isFlagMode {
-            onSecondaryAction()
-        } else {
-            onPrimaryAction()
-        }
-    }
-
-    private func performFlag() {
-        if isFlagMode {
-            onPrimaryAction()
-        } else {
-            onSecondaryAction()
-        }
-    }
-
-    private func performAlternateAccessibilityAction() {
-        switch cell.state {
-        case .hidden:
-            if isFlagMode {
-                performReveal()
-            } else {
-                performFlag()
+        face
+            .frame(width: side, height: side)
+            .accessibilityElement(children: .ignore)
+            .accessibilityIdentifier("tile-\(row)-\(column)")
+            .accessibilityLabel("第 \(row + 1) 行第 \(column + 1) 列")
+            .accessibilityValue(accessibilityValue)
+            .accessibilityHint(accessibilityHint)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default) {
+                guard isGameActive else { return }
+                onAccessibilityActivate()
             }
-        case .flagged:
-            performFlag()
-        case .revealed:
-            performReveal()
-        }
+            .accessibilityAction(named: Text(alternateActionName)) {
+                guard isGameActive else { return }
+                onAccessibilityAlternate()
+            }
     }
 
     // MARK: - Tile faces
@@ -133,17 +67,29 @@ struct TileView: View {
     }
 
     private var hiddenFace: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [Theme.hiddenTop, Theme.hiddenBottom],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+        ZStack {
+            hiddenBackground
+
+            if cell.isFlagged {
+                flagGlyph
+                wrongFlagBadge
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var hiddenBackground: some View {
+        if usesRichEffects {
+            tileShape
+                .fill(
+                    LinearGradient(
+                        colors: [Theme.hiddenTop, Theme.hiddenBottom],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
+                .overlay {
+                    tileShape.strokeBorder(
                         LinearGradient(
                             colors: [Color.white.opacity(0.20), Color.white.opacity(0.025)],
                             startPoint: .topLeading,
@@ -151,46 +97,88 @@ struct TileView: View {
                         ),
                         lineWidth: 0.7
                     )
-            }
-            .overlay(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: cornerRadius * 0.65, style: .continuous)
-                    .fill(Color.white.opacity(0.045))
-                    .frame(width: side * 0.52, height: max(1, side * 0.10))
-                    .padding(side * 0.12)
-                    .blur(radius: 0.4)
-            }
-            .shadow(color: Color.black.opacity(0.24), radius: side >= 28 ? 1.2 : 0.4, x: 0, y: side >= 28 ? 1.2 : 0.5)
+                }
+                .overlay(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: cornerRadius * 0.65, style: .continuous)
+                        .fill(Color.white.opacity(0.045))
+                        .frame(width: side * 0.52, height: max(1, side * 0.10))
+                        .padding(side * 0.12)
+                        .blur(radius: 0.4)
+                }
+                .shadow(color: Color.black.opacity(0.24), radius: 1.2, x: 0, y: 1.2)
+        } else {
+            tileShape
+                .fill(
+                    LinearGradient(
+                        colors: [Theme.hiddenTop, Theme.hiddenBottom],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    tileShape.strokeBorder(Color.white.opacity(0.09), lineWidth: 0.6)
+                }
+        }
     }
 
     private var flaggedFace: some View {
         hiddenFace
+    }
+
+    private var flagGlyph: some View {
+        Image(systemName: "flag.fill")
+            .font(.system(size: max(8, side * 0.40), weight: .black))
+            .foregroundStyle(Theme.goldGradient)
+            .shadow(
+                color: usesRichEffects ? Color.black.opacity(0.45) : .clear,
+                radius: usesRichEffects ? 1 : 0,
+                x: 0,
+                y: usesRichEffects ? 1 : 0
+            )
+    }
+
+    @ViewBuilder
+    private var wrongFlagBadge: some View {
+        if cell.isWrongFlag {
+            ZStack {
+                Circle()
+                    .fill(Theme.danger)
+                Image(systemName: "xmark")
+                    .font(.system(size: max(4, side * 0.18), weight: .black))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: max(9, side * 0.34), height: max(9, side * 0.34))
             .overlay {
-                Image(systemName: "flag.fill")
-                    .font(.system(size: max(8, side * 0.40), weight: .black))
-                    .foregroundStyle(Theme.goldGradient)
-                    .shadow(color: Color.black.opacity(0.45), radius: 1, x: 0, y: 1)
+                Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: 0.5)
             }
-            .overlay(alignment: .bottomTrailing) {
-                if cell.isWrongFlag {
-                    ZStack {
-                        Circle()
-                            .fill(Theme.danger)
-                        Image(systemName: "xmark")
-                            .font(.system(size: max(4, side * 0.18), weight: .black))
-                            .foregroundStyle(.white)
-                    }
-                    .frame(width: max(9, side * 0.34), height: max(9, side * 0.34))
-                    .overlay {
-                        Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: 0.5)
-                    }
-                    .padding(side * 0.06)
-                }
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .padding(side * 0.06)
+        }
     }
 
     private var revealedFace: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            revealedBackground
+
+            if cell.hasMine {
+                Text("💣")
+                    .font(.system(size: max(10, side * 0.58)))
+                    .shadow(
+                        color: usesRichEffects ? Color.black.opacity(0.45) : .clear,
+                        radius: usesRichEffects ? 1 : 0,
+                        x: 0,
+                        y: usesRichEffects ? 1 : 0
+                    )
+            } else if cell.adjacentMineCount > 0 {
+                numberView
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var revealedBackground: some View {
+        if usesRichEffects {
+            tileShape
                 .fill(
                     LinearGradient(
                         colors: [Theme.revealedTop, Theme.revealedBottom],
@@ -199,27 +187,59 @@ struct TileView: View {
                     )
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Theme.revealedStroke, lineWidth: 0.5)
+                    tileShape.strokeBorder(Theme.revealedStroke, lineWidth: 0.5)
                 }
+        } else {
+            tileShape
+                .fill(Theme.revealedTop)
+                .overlay {
+                    tileShape.strokeBorder(Color.white.opacity(0.05), lineWidth: 0.5)
+                }
+        }
+    }
 
-            if cell.hasMine {
-                Text("💣")
-                    .font(.system(size: max(10, side * 0.58)))
-                    .shadow(color: Color.black.opacity(0.45), radius: 1, x: 0, y: 1)
-            } else if cell.adjacentMineCount > 0 {
-                Text("\(cell.adjacentMineCount)")
-                    .font(.system(size: numberFontSize, weight: .black, design: .rounded))
-                    .foregroundStyle(Theme.number(cell.adjacentMineCount))
-                    .shadow(color: Theme.number(cell.adjacentMineCount).opacity(0.24), radius: 3)
-                    .minimumScaleFactor(0.7)
-            }
+    private var numberText: Text {
+        Text("\(cell.adjacentMineCount)")
+            .font(.system(size: numberFontSize, weight: .black, design: .rounded))
+            .foregroundStyle(Theme.number(cell.adjacentMineCount))
+    }
+
+    @ViewBuilder
+    private var numberView: some View {
+        if usesRichEffects {
+            numberText
+                .shadow(color: Theme.number(cell.adjacentMineCount).opacity(0.24), radius: 3)
+                .minimumScaleFactor(0.7)
+        } else {
+            numberText
+                .minimumScaleFactor(0.7)
         }
     }
 
     private var explodedFace: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            explodedBackground
+
+            Circle()
+                .fill(Color.white.opacity(usesRichEffects ? 0.18 : 0.07))
+                .frame(width: side * 0.7, height: side * 0.7)
+                .blur(radius: usesRichEffects ? side * 0.12 : 0)
+
+            Text("💥")
+                .font(.system(size: max(10, side * 0.60)))
+                .shadow(
+                    color: usesRichEffects ? Color.black.opacity(0.35) : .clear,
+                    radius: usesRichEffects ? 1 : 0,
+                    x: 0,
+                    y: usesRichEffects ? 1 : 0
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var explodedBackground: some View {
+        if usesRichEffects {
+            tileShape
                 .fill(
                     LinearGradient(
                         colors: [Color(hex: 0xFF8268), Theme.dangerDeep],
@@ -228,19 +248,15 @@ struct TileView: View {
                     )
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.32), lineWidth: 0.8)
+                    tileShape.strokeBorder(Color.white.opacity(0.32), lineWidth: 0.8)
                 }
                 .shadow(color: Theme.danger.opacity(0.4), radius: 8, x: 0, y: 0)
-
-            Circle()
-                .fill(Color.white.opacity(0.18))
-                .frame(width: side * 0.7, height: side * 0.7)
-                .blur(radius: side * 0.12)
-
-            Text("💥")
-                .font(.system(size: max(10, side * 0.60)))
-                .shadow(color: Color.black.opacity(0.35), radius: 1, x: 0, y: 1)
+        } else {
+            tileShape
+                .fill(Theme.dangerDeep)
+                .overlay {
+                    tileShape.strokeBorder(Color.white.opacity(0.22), lineWidth: 0.6)
+                }
         }
     }
 
@@ -278,7 +294,7 @@ struct TileView: View {
         }
     }
 
-    private var secondaryActionName: String {
+    private var alternateActionName: String {
         switch cell.state {
         case .hidden:
             return isFlagMode ? "翻开" : "插旗"
@@ -287,18 +303,5 @@ struct TileView: View {
         case .revealed:
             return "翻开周围"
         }
-    }
-}
-
-
-private struct TilePressStyle: ButtonStyle {
-    let isEnabled: Bool
-    let reduceMotion: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(isEnabled && configuration.isPressed ? 0.92 : 1)
-            .brightness(isEnabled && configuration.isPressed ? 0.04 : 0)
-            .animation(reduceMotion ? nil : .snappy(duration: 0.14), value: configuration.isPressed)
     }
 }

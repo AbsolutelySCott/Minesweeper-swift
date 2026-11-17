@@ -11,11 +11,16 @@ struct BoardView: View {
     let onReplay: () -> Void
     let onInspectBoard: () -> Void
 
+    var showsHeader = true
+    var edgeInset: CGFloat = 12
+    var cardCornerRadius: CGFloat = 30
+    var onEnterFullScreen: (() -> Void)?
+
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var cardShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 30, style: .continuous)
+        RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
     }
 
     var body: some View {
@@ -57,12 +62,15 @@ struct BoardView: View {
 
     private var boardContent: some View {
         VStack(spacing: 0) {
-            boardHeader
+            if showsHeader {
+                boardHeader
+            }
 
             GeometryReader { proxy in
                 let layout = BoardLayout(
                     configuration: game.configuration,
-                    viewport: proxy.size
+                    viewport: proxy.size,
+                    edgeInset: edgeInset
                 )
                 boardViewport(layout: layout, viewport: proxy.size)
             }
@@ -139,6 +147,28 @@ struct BoardView: View {
                     .contentTransition(.numericText(countsDown: false))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+
+                if let onEnterFullScreen {
+                    Button(action: onEnterFullScreen) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Theme.boardText.opacity(0.82))
+                            .frame(width: 28, height: 28)
+                            .contentShape(.circle)
+                            .background {
+                                Circle()
+                                    .fill(Color.white.opacity(0.055))
+                            }
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.6)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("进入全屏模式")
+                    .accessibilityHint("隐藏其他界面，放大棋盘")
+                    .accessibilityIdentifier("fullscreen-button")
+                }
             }
 
             GeometryReader { proxy in
@@ -164,14 +194,12 @@ struct BoardView: View {
         .padding(.horizontal, 16)
         .padding(.top, 14)
         .padding(.bottom, 12)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("扫雷棋盘，\(game.configuration.sizeLabel)，\(game.configuration.mineCount) 颗地雷")
-        .accessibilityValue(statusText)
+        .accessibilityElement(children: .contain)
     }
 
     private func boardViewport(layout: BoardLayout, viewport: CGSize) -> some View {
         ScrollView([.horizontal, .vertical]) {
-            boardGrid(layout: layout)
+            interactiveBoardGrid(layout: layout)
                 .padding(layout.inset)
                 .frame(
                     minWidth: viewport.width,
@@ -191,6 +219,24 @@ struct BoardView: View {
         )
     }
 
+    private func interactiveBoardGrid(layout: BoardLayout) -> some View {
+        boardGrid(layout: layout)
+            // Rasterize the many tile shapes into one layer so scrolling the
+            // 480-cell expert board stays smooth on phones.
+            .drawingGroup()
+            .overlay {
+                BoardInteractionLayer(
+                    columns: game.configuration.columns,
+                    rows: game.configuration.rows,
+                    tileSide: layout.tile,
+                    spacing: layout.gap,
+                    onTap: handleTap,
+                    onLongPress: handleLongPress
+                )
+                .accessibilityHidden(true)
+            }
+    }
+
     private func boardGrid(layout: BoardLayout) -> some View {
         VStack(spacing: layout.gap) {
             ForEach(0..<game.configuration.rows, id: \.self) { row in
@@ -205,14 +251,70 @@ struct BoardView: View {
                             side: layout.tile,
                             isGameActive: !game.status.isOver,
                             isFlagMode: isFlagMode,
-                            onPrimaryAction: { onPrimaryAction(index) },
-                            onSecondaryAction: { onSecondaryAction(index) }
+                            onAccessibilityActivate: {
+                                handleTap(at: index)
+                            },
+                            onAccessibilityAlternate: {
+                                handleLongPress(at: index)
+                            }
                         )
                     }
                 }
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: - Touch dispatch
+
+    private func handleTap(at index: Int) {
+        guard isActive, game.configuration.contains(index: index) else { return }
+        let cell = game.cells[index]
+
+        if cell.isRevealed {
+            performReveal(at: index)
+        } else if cell.isFlagged {
+            performFlag(at: index)
+        } else if isFlagMode {
+            performFlag(at: index)
+        } else {
+            performReveal(at: index)
+        }
+    }
+
+    private func handleLongPress(at index: Int) {
+        guard isActive, game.configuration.contains(index: index) else { return }
+        let cell = game.cells[index]
+
+        if cell.isRevealed {
+            performReveal(at: index)
+        } else if cell.isFlagged {
+            performFlag(at: index)
+        } else if isFlagMode {
+            performReveal(at: index)
+        } else {
+            performFlag(at: index)
+        }
+    }
+
+    private func performReveal(at index: Int) {
+        if isFlagMode {
+            onSecondaryAction(index)
+        } else {
+            onPrimaryAction(index)
+        }
+    }
+
+    private func performFlag(at index: Int) {
+        if isFlagMode {
+            onPrimaryAction(index)
+        } else {
+            onSecondaryAction(index)
+        }
+    }
+
+    private var isActive: Bool {
+        !game.status.isOver
     }
 
     private var statusTint: Color {
@@ -244,8 +346,8 @@ private struct BoardLayout {
     let inset: CGFloat
     let isScrollable: Bool
 
-    init(configuration: BoardConfiguration, viewport: CGSize) {
-        let inset: CGFloat = 12
+    init(configuration: BoardConfiguration, viewport: CGSize, edgeInset: CGFloat) {
+        let inset = edgeInset
         let gap: CGFloat = configuration.columns >= 13 ? 2 : 3
         let maximumTile: CGFloat = viewport.width > 600 ? 64 : 52
         let minimumTile: CGFloat = 20

@@ -110,9 +110,10 @@ private struct TimerCounter: View {
     }
 }
 
-private struct ResetFaceButton: View {
+struct ResetFaceButton: View {
     let status: GameStatus
     let action: () -> Void
+    var diameter: CGFloat = 51
 
     private var face: String {
         switch status {
@@ -125,8 +126,8 @@ private struct ResetFaceButton: View {
     var body: some View {
         Button(action: action) {
             Text(face)
-                .font(.system(size: 28))
-                .frame(width: 51, height: 51)
+                .font(.system(size: diameter * 0.55))
+                .frame(width: diameter, height: diameter)
                 .background {
                     Circle()
                         .fill(

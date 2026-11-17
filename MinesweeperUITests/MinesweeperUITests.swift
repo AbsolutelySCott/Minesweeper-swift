@@ -109,6 +109,47 @@ final class MinesweeperUITests: XCTestCase {
     }
 
     @MainActor
+    func testFullScreenMode() throws {
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))
+
+        let enterFullScreen = app.buttons["fullscreen-button"]
+        XCTAssertTrue(enterFullScreen.waitForExistence(timeout: 3))
+        enterFullScreen.tap()
+
+        let exitFullScreen = app.buttons["fullscreen-exit"]
+        XCTAssertTrue(exitFullScreen.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["fullscreen-flag-mode"].exists)
+        XCTAssertFalse(app.buttons["stats-button"].exists)
+
+        let centerTile = tile(in: app, row: 4, column: 4)
+        XCTAssertTrue(centerTile.waitForExistence(timeout: 3))
+        centerTile.tap()
+
+        let opened = NSPredicate(format: "value != '未翻开'")
+        expectation(for: opened, evaluatedWith: centerTile)
+        waitForExpectations(timeout: 3)
+
+        app.buttons["fullscreen-flag-mode"].tap()
+        let hidden = firstHiddenTile(in: app)
+        XCTAssertTrue(hidden.waitForExistence(timeout: 3))
+        let hiddenIdentifier = hidden.identifier
+        hidden.tap()
+
+        let flaggedTile = app.descendants(matching: .any)[hiddenIdentifier]
+        let isFlagged = NSPredicate(format: "value == '已插旗'")
+        expectation(for: isFlagged, evaluatedWith: flaggedTile)
+        waitForExpectations(timeout: 3)
+
+        attachScreenshot(app, name: "13-fullscreen-mode")
+
+        exitFullScreen.tap()
+        XCTAssertTrue(app.buttons["stats-button"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["fullscreen-button"].exists)
+        XCTAssertFalse(app.buttons["fullscreen-exit"].exists)
+    }
+
+    @MainActor
     func testLossShowsResultAndRecordsStats() throws {
         let app = launchApp()
         XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))

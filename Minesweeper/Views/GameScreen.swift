@@ -5,6 +5,7 @@ struct GameScreen: View {
     @State private var showsStats = false
     @State private var showsHelp = false
     @State private var isResultVisible = false
+    @State private var isFullScreen = false
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -15,52 +16,15 @@ struct GameScreen: View {
         ZStack {
             GameBackground()
 
-            VStack(spacing: isRegularWidth ? 15 : 11) {
-                header
-                    .frame(maxWidth: isRegularWidth ? 700 : .infinity)
-
-                DifficultySelector(selection: model.difficulty) { difficulty in
-                    model.selectDifficulty(difficulty)
-                }
-                .frame(maxWidth: isRegularWidth ? 700 : .infinity)
-
-                HUDView(game: model.game) {
-                    model.startNewGame()
-                }
-                .frame(maxWidth: isRegularWidth ? 700 : .infinity)
-
-                BoardView(
-                    game: model.game,
-                    isFlagMode: model.isFlagMode,
-                    bestSeconds: model.currentBestSeconds,
-                    result: model.result,
-                    isResultVisible: isResultVisible,
-                    onPrimaryAction: { model.primaryTap(at: $0) },
-                    onSecondaryAction: { model.secondaryTap(at: $0) },
-                    onReplay: replay,
-                    onInspectBoard: inspectBoard
-                )
-                .frame(
-                    maxWidth: isRegularWidth ? boardWidth : .infinity,
-                    maxHeight: isRegularWidth ? boardHeight : .infinity
-                )
-
-                GameFooter(
-                    bestSeconds: model.currentBestSeconds,
-                    isFlagMode: model.isFlagMode,
-                    onToggleFlagMode: {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-                            model.toggleFlagMode()
-                        }
-                    }
-                )
-                .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+            if isFullScreen {
+                fullScreenLayout
+                    .transition(.opacity)
+            } else {
+                standardLayout
+                    .transition(.opacity)
             }
-            .padding(.horizontal, isRegularWidth ? 28 : 14)
-            .padding(.top, 4)
-            .padding(.bottom, 3)
-            .frame(maxWidth: 1040, maxHeight: .infinity)
         }
+        .statusBarHidden(isFullScreen)
         .sheet(isPresented: $showsStats) {
             StatsSheet(model: model)
         }
@@ -72,6 +36,86 @@ struct GameScreen: View {
         }
         .tint(Theme.goldDeep)
     }
+
+    // MARK: - Layouts
+
+    private var standardLayout: some View {
+        VStack(spacing: isRegularWidth ? 15 : 11) {
+            header
+                .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+
+            DifficultySelector(selection: model.difficulty) { difficulty in
+                model.selectDifficulty(difficulty)
+            }
+            .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+
+            HUDView(game: model.game) {
+                model.startNewGame()
+            }
+            .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+
+            board(fullScreen: false)
+                .frame(
+                    maxWidth: isRegularWidth ? boardWidth : .infinity,
+                    maxHeight: isRegularWidth ? boardHeight : .infinity
+                )
+
+            GameFooter(
+                bestSeconds: model.currentBestSeconds,
+                isFlagMode: model.isFlagMode,
+                onToggleFlagMode: toggleFlagMode
+            )
+            .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+        }
+        .padding(.horizontal, isRegularWidth ? 28 : 14)
+        .padding(.top, 4)
+        .padding(.bottom, 3)
+        .frame(maxWidth: 1040, maxHeight: .infinity)
+    }
+
+    private var fullScreenLayout: some View {
+        VStack(spacing: 8) {
+            FullScreenHUD(
+                game: model.game,
+                difficulty: model.difficulty,
+                isFlagMode: model.isFlagMode,
+                onExit: exitFullScreen,
+                onReset: { model.startNewGame() },
+                onToggleFlagMode: toggleFlagMode
+            )
+            .frame(maxWidth: isRegularWidth ? 760 : .infinity)
+
+            board(fullScreen: true)
+                .frame(
+                    maxWidth: isRegularWidth ? fullScreenBoardWidth : .infinity,
+                    maxHeight: isRegularWidth ? fullScreenBoardHeight : .infinity
+                )
+        }
+        .padding(.horizontal, isRegularWidth ? 16 : 8)
+        .padding(.top, 2)
+        .padding(.bottom, isRegularWidth ? 6 : 2)
+        .frame(maxWidth: 1280, maxHeight: .infinity)
+    }
+
+    private func board(fullScreen: Bool) -> some View {
+        BoardView(
+            game: model.game,
+            isFlagMode: model.isFlagMode,
+            bestSeconds: model.currentBestSeconds,
+            result: model.result,
+            isResultVisible: isResultVisible,
+            onPrimaryAction: { model.primaryTap(at: $0) },
+            onSecondaryAction: { model.secondaryTap(at: $0) },
+            onReplay: replay,
+            onInspectBoard: inspectBoard,
+            showsHeader: !fullScreen,
+            edgeInset: fullScreen ? 8 : 12,
+            cardCornerRadius: fullScreen ? 24 : 30,
+            onEnterFullScreen: fullScreen ? nil : { enterFullScreen() }
+        )
+    }
+
+    // MARK: - Header
 
     private var header: some View {
         HStack(spacing: 12) {
@@ -114,6 +158,28 @@ struct GameScreen: View {
         .frame(maxWidth: .infinity)
     }
 
+    // MARK: - Actions
+
+    private func toggleFlagMode() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            model.toggleFlagMode()
+        }
+    }
+
+    private func enterFullScreen() {
+        Haptics.impact(.light, intensity: 0.7)
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
+            isFullScreen = true
+        }
+    }
+
+    private func exitFullScreen() {
+        Haptics.impact(.light, intensity: 0.7)
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
+            isFullScreen = false
+        }
+    }
+
     private var boardWidth: CGFloat {
         switch model.difficulty {
         case .beginner, .intermediate: 700
@@ -128,6 +194,24 @@ struct GameScreen: View {
         case .expert: 620
         }
     }
+
+    private var fullScreenBoardWidth: CGFloat {
+        switch model.difficulty {
+        case .beginner: 780
+        case .intermediate: 900
+        case .expert: 960
+        }
+    }
+
+    private var fullScreenBoardHeight: CGFloat {
+        switch model.difficulty {
+        case .beginner: 780
+        case .intermediate: 900
+        case .expert: 600
+        }
+    }
+
+    // MARK: - Result presentation
 
     private var resultTaskID: String {
         guard let result = model.result else { return "no-result-\(model.game.id.uuidString)" }
