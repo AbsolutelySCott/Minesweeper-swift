@@ -1,0 +1,294 @@
+import SwiftUI
+
+struct StatsSheet: View {
+    let model: GameModel
+
+    @AppStorage("minesweeper.hapticsEnabled") private var hapticsEnabled = true
+    @State private var isConfirmingReset = false
+
+    private var stats: PlayerStats { model.stats }
+
+    var body: some View {
+        SheetScaffold(title: "战绩", subtitle: "每一次排雷，都值得记录") {
+            VStack(spacing: 18) {
+                summaryCard
+                recordsCard
+                settingsCard
+                aboutFooter
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
+        .onChange(of: hapticsEnabled) { _, enabled in
+            if enabled { Haptics.selection() }
+        }
+        .alert("清空所有战绩？", isPresented: $isConfirmingReset) {
+            Button("取消", role: .cancel) {}
+            Button("清空", role: .destructive) {
+                model.resetStats()
+            }
+        } message: {
+            Text("所有难度的最佳时间和胜率都会被删除，此操作无法撤销。")
+        }
+    }
+
+    // MARK: - Summary
+
+    private var summaryCard: some View {
+        HStack(spacing: 22) {
+            winRateRing
+
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stats.totalGames == 0 ? "等待第一局" : "保持冷静，继续排雷")
+                        .font(.gameRounded(16, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    Text(stats.totalGames == 0 ? "完成一局游戏后，这里会记录你的表现。" : "你已累计完成 \(stats.totalGames) 局游戏。")
+                        .font(.gameRounded(11.5, weight: .regular))
+                        .foregroundStyle(Theme.secondaryInk)
+                        .lineSpacing(2)
+                }
+
+                HStack(spacing: 20) {
+                    summaryMetric(value: "\(stats.totalWins)", label: "胜利局数")
+                    summaryMetric(value: "\(stats.totalGames - stats.totalWins)", label: "失败局数")
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .glassPanel(cornerRadius: 26)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("总战绩，\(stats.totalGames) 局，胜利 \(stats.totalWins) 局，胜率 \(winRateText)")
+    }
+
+    private var winRateRing: some View {
+        ZStack {
+            Circle()
+                .stroke(Theme.ink.opacity(0.08), lineWidth: 7)
+
+            Circle()
+                .trim(from: 0, to: max(0.001, stats.winRate))
+                .stroke(
+                    Theme.goldGradient,
+                    style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .opacity(stats.winRate > 0 ? 1 : 0)
+                .animation(.spring(duration: 0.6, bounce: 0.15), value: stats.winRate)
+
+            VStack(spacing: 1) {
+                Text(winRateText)
+                    .font(.gameMono(23, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                Text("胜率")
+                    .font(.gameRounded(8.5, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(Theme.tertiaryInk)
+            }
+        }
+        .frame(width: 93, height: 93)
+        .accessibilityHidden(true)
+    }
+
+    private var winRateText: String {
+        guard stats.totalGames > 0 else { return "—" }
+        return "\(Int((stats.winRate * 100).rounded()))%"
+    }
+
+    private func summaryMetric(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.gameMono(16, weight: .bold))
+                .foregroundStyle(Theme.ink)
+            Text(label)
+                .font(.gameRounded(9, weight: .medium))
+                .foregroundStyle(Theme.tertiaryInk)
+        }
+    }
+
+    // MARK: - Records
+
+    private var recordsCard: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("难度纪录")
+                    .font(.gameRounded(11, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.secondaryInk)
+                Spacer()
+                Text("最佳 / 胜局 / 总局")
+                    .font(.gameRounded(9, weight: .medium))
+                    .foregroundStyle(Theme.tertiaryInk)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 16)
+            .padding(.bottom, 4)
+
+            ForEach(Difficulty.allCases) { difficulty in
+                let record = stats.record(for: difficulty)
+                DifficultyRecordRow(difficulty: difficulty, record: record)
+
+                if difficulty != Difficulty.allCases.last {
+                    Rectangle()
+                        .fill(Theme.ink.opacity(0.06))
+                        .frame(height: 0.7)
+                        .padding(.leading, 18)
+                }
+            }
+        }
+        .padding(.bottom, 6)
+        .glassPanel(cornerRadius: 26)
+    }
+
+    // MARK: - Settings
+
+    private var settingsCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "iphone.radiowaves.left.and.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.goldDeep)
+                    .frame(width: 30, height: 30)
+                    .background(Theme.gold.opacity(0.11), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("触感反馈")
+                        .font(.gameRounded(13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("翻格、插旗和结束时提供细微震动")
+                        .font(.gameRounded(10, weight: .regular))
+                        .foregroundStyle(Theme.tertiaryInk)
+                }
+
+                Spacer()
+
+                Toggle("触感反馈", isOn: $hapticsEnabled)
+                    .labelsHidden()
+                    .tint(Theme.goldDeep)
+                    .accessibilityHint("开启或关闭游戏震动")
+            }
+            .padding(16)
+
+            Rectangle()
+                .fill(Theme.ink.opacity(0.06))
+                .frame(height: 0.7)
+                .padding(.leading, 58)
+
+            Button {
+                isConfirmingReset = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.coral)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.coral.opacity(0.09), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                    Text("重置所有战绩")
+                        .font(.gameRounded(13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+
+                    Spacer()
+
+                    Text(stats.totalGames == 0 ? "暂无数据" : "\(stats.totalGames) 局")
+                        .font(.gameRounded(10, weight: .medium))
+                        .foregroundStyle(Theme.tertiaryInk)
+                }
+                .padding(16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SettingsRowButtonStyle())
+            .disabled(stats.totalGames == 0)
+            .opacity(stats.totalGames == 0 ? 0.55 : 1)
+            .accessibilityHint(stats.totalGames == 0 ? "暂无可重置的战绩" : "会清空所有难度的记录")
+        }
+        .glassPanel(cornerRadius: 26)
+    }
+
+    private var aboutFooter: some View {
+        VStack(spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: "flag.fill")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundStyle(Theme.goldDeep)
+                Text("扫雷")
+                    .font(.gameRounded(11, weight: .bold))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            Text("版本 \(version) · 为 iOS 27.2 打造")
+                .font(.gameRounded(9.5, weight: .medium))
+                .foregroundStyle(Theme.tertiaryInk)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var version: String {
+        let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(shortVersion) (\(build))"
+    }
+}
+
+private struct DifficultyRecordRow: View {
+    let difficulty: Difficulty
+    let record: PlayerStats.Record
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 7, height: 7)
+                .frame(width: 18, height: 18)
+                .background(dotColor.opacity(0.10), in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(difficulty.title)
+                    .font(.gameRounded(13, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                Text(difficulty.summary)
+                    .font(.gameMono(9, weight: .medium))
+                    .foregroundStyle(Theme.tertiaryInk)
+            }
+
+            Spacer(minLength: 6)
+
+            Text(record.bestSeconds.map(TimeFormat.clock) ?? "—")
+                .font(.gameMono(12.5, weight: .bold))
+                .foregroundStyle(record.bestSeconds == nil ? Theme.tertiaryInk : Theme.goldDeep)
+                .frame(width: 54, alignment: .trailing)
+
+            Text("\(record.wins) / \(record.games)")
+                .font(.gameMono(11, weight: .semibold))
+                .foregroundStyle(Theme.secondaryInk)
+                .frame(width: 46, alignment: .trailing)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 13)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(difficulty.title)，最佳时间 \(record.bestSeconds.map(TimeFormat.clock) ?? "暂无")，胜利 \(record.wins) 局，共 \(record.games) 局"
+        )
+    }
+
+    private var dotColor: Color {
+        switch difficulty {
+        case .beginner: Theme.mint
+        case .intermediate: Theme.sky
+        case .expert: Theme.gold
+        }
+    }
+}
+
+private struct SettingsRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Theme.ink.opacity(0.035) : .clear)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
