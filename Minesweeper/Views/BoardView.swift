@@ -1,3 +1,4 @@
+import Accessibility
 import SwiftUI
 
 struct BoardView: View {
@@ -20,6 +21,7 @@ struct BoardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppTheme.storageKey) private var themeRawValue = AppTheme.midnightGold.rawValue
+    @State private var applicationAccessibilityEnabled = AccessibilitySettings.isApplicationAccessibilityEnabled
 
     @State private var zoomScale: CGFloat = 1
     @GestureState private var pinchMagnification: CGFloat = 1
@@ -46,6 +48,13 @@ struct BoardView: View {
                 .transition(.opacity)
                 .zIndex(2)
             }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AccessibilitySettings.applicationAccessibilityEnabledDidChangeNotification
+            )
+        ) { _ in
+            applicationAccessibilityEnabled = AccessibilitySettings.isApplicationAccessibilityEnabled
         }
         .background(boardSurface)
         .clipShape(cardShape)
@@ -329,16 +338,23 @@ struct BoardView: View {
                 spacing: geometry.gap
             )
 
-            BoardAccessibilityGrid(
-                cells: game.cells,
-                configuration: game.configuration,
-                tile: geometry.tile,
-                spacing: geometry.gap,
-                isGameActive: !game.status.isOver,
-                isFlagMode: isFlagMode,
-                onActivate: { index in handleTap(at: index) },
-                onAlternate: { index in handleLongPress(at: index) }
-            )
+            // Building 480 accessible cells is only worthwhile when an
+            // assistive technology is actually consuming the AX tree. iOS
+            // tells us when that changes, including when VoiceOver, Switch
+            // Control, Voice Control, keyboard access, or test automation is
+            // attached.
+            if applicationAccessibilityEnabled {
+                BoardAccessibilityGrid(
+                    cells: game.cells,
+                    configuration: game.configuration,
+                    tile: geometry.tile,
+                    spacing: geometry.gap,
+                    isGameActive: !game.status.isOver,
+                    isFlagMode: isFlagMode,
+                    onActivate: { index in handleTap(at: index) },
+                    onAlternate: { index in handleLongPress(at: index) }
+                )
+            }
 
             BoardInteractionLayer(
                 columns: game.configuration.columns,
