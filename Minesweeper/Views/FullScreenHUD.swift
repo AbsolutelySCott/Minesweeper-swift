@@ -41,8 +41,8 @@ struct FullScreenHUD: View {
 
             if supportsOrientationToggle {
                 Button(action: onToggleOrientation) {
-                    Image(systemName: "rectangle.landscape.rotate")
-                        .font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(palette.ink)
                         .frame(width: 33, height: 33)
                         .contentShape(.circle)
@@ -55,7 +55,7 @@ struct FullScreenHUD: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("切换横竖屏")
-                .accessibilityHint("在横屏与竖屏全屏布局之间切换")
+                .accessibilityHint("以顺时针方向在横屏与竖屏全屏布局之间切换")
                 .accessibilityIdentifier("fullscreen-orientation")
             }
 

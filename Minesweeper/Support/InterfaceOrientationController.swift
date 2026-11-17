@@ -1,6 +1,6 @@
 import UIKit
 
-/// Requests a one-shot portrait/landscape interface update from the active
+/// Requests a one-shot clockwise portrait/landscape interface update from the active
 /// window scene. iOS keeps the app's normal rotation behavior afterward, so the
 /// physical device can still be rotated freely.
 @MainActor
@@ -17,9 +17,11 @@ enum InterfaceOrientationController {
         case .landscapeLeft, .landscapeRight:
             target = .portrait
         case .portrait, .portraitUpsideDown:
-            target = .landscape
+            // Requesting landscapeRight rotates the content clockwise from
+            // portrait, which matches the app's previous natural rotation.
+            target = .landscapeRight
         default:
-            target = .landscape
+            target = .landscapeRight
         }
 
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { _ in
