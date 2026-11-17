@@ -4,6 +4,7 @@ import SwiftUI
 /// mode. Everything non-essential is hidden so the board gets as much room as
 /// possible.
 struct FullScreenHUD: View {
+    @Environment(\.gamePalette) private var palette
     let game: MinesweeperGame
     let difficulty: Difficulty
     let isFlagMode: Bool
@@ -16,14 +17,14 @@ struct FullScreenHUD: View {
             Button(action: onExit) {
                 Image(systemName: "arrow.down.right.and.arrow.up.left")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(palette.ink)
                     .frame(width: 33, height: 33)
                     .contentShape(.circle)
                     .background {
-                        Circle().fill(Theme.ink.opacity(0.06))
+                        Circle().fill(palette.ink.opacity(0.06))
                     }
                     .overlay {
-                        Circle().strokeBorder(Theme.ink.opacity(0.10), lineWidth: 0.7)
+                        Circle().strokeBorder(palette.ink.opacity(0.10), lineWidth: 0.7)
                     }
             }
             .buttonStyle(.plain)
@@ -35,15 +36,15 @@ struct FullScreenHUD: View {
                 Text(difficulty.title)
                     .font(.gameRounded(8, weight: .bold))
                     .tracking(1)
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
 
                 HStack(spacing: 4) {
                     Image(systemName: "flag.fill")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Theme.goldDeep)
+                        .foregroundStyle(palette.flagDeep)
                     Text(TimeFormat.counter(game.remainingMines))
                         .font(.gameMono(16, weight: .bold))
-                        .foregroundStyle(Theme.ink)
+                        .foregroundStyle(palette.ink)
                         .contentTransition(.numericText(countsDown: true))
                         .animation(.snappy(duration: 0.2), value: game.remainingMines)
                 }
@@ -67,17 +68,17 @@ struct FullScreenHUD: View {
                     Text("标记")
                         .font(.gameRounded(10, weight: .bold))
                 }
-                .foregroundStyle(isFlagMode ? Color(hex: 0x261A08) : Theme.secondaryInk)
+                .foregroundStyle(isFlagMode ? palette.onAccent : palette.secondaryInk)
                 .padding(.horizontal, 10)
                 .frame(height: 33)
                 .contentShape(.capsule)
                 .background {
                     Capsule(style: .continuous)
-                        .fill(isFlagMode ? AnyShapeStyle(Theme.goldGradient) : AnyShapeStyle(Theme.ink.opacity(0.05)))
+                        .fill(isFlagMode ? AnyShapeStyle(palette.accentGradient) : AnyShapeStyle(palette.ink.opacity(0.05)))
                 }
                 .overlay {
                     Capsule(style: .continuous)
-                        .strokeBorder(isFlagMode ? Color.clear : Theme.ink.opacity(0.11), lineWidth: 0.7)
+                        .strokeBorder(isFlagMode ? Color.clear : palette.ink.opacity(0.11), lineWidth: 0.7)
                 }
             }
             .buttonStyle(.plain)
@@ -92,7 +93,8 @@ struct FullScreenHUD: View {
     }
 }
 
-private struct CompactTimer: View {
+struct CompactTimer: View {
+    @Environment(\.gamePalette) private var palette
     let game: MinesweeperGame
 
     var body: some View {
@@ -112,15 +114,15 @@ private struct CompactTimer: View {
             Text("用时")
                 .font(.gameRounded(8, weight: .bold))
                 .tracking(1)
-                .foregroundStyle(Theme.secondaryInk)
+                .foregroundStyle(palette.secondaryInk)
 
             HStack(spacing: 4) {
                 Image(systemName: "timer")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Theme.mint.opacity(0.9))
+                    .foregroundStyle(palette.mint.opacity(0.9))
                 Text(TimeFormat.clock(seconds))
                     .font(.gameMono(16, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(palette.ink)
                     .contentTransition(.numericText(countsDown: false))
                     .monospacedDigit()
             }

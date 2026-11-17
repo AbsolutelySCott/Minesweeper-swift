@@ -1,7 +1,9 @@
 import Foundation
 import UIKit
 
-/// Small wrappers around UIKit's feedback generators.
+/// Small wrappers around UIKit's feedback generators. The generators are
+/// created once and kept warm so the first tap of a game does not pay for
+/// engine startup.
 @MainActor
 enum Haptics {
     enum Impact {
@@ -40,23 +42,56 @@ enum Haptics {
         UserDefaults.standard.object(forKey: "minesweeper.hapticsEnabled") as? Bool ?? true
     }
 
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private static let softGenerator = UIImpactFeedbackGenerator(style: .soft)
+    private static let rigidGenerator = UIImpactFeedbackGenerator(style: .rigid)
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+
+    static func prepare() {
+        guard isEnabled else { return }
+        let generators: [UIFeedbackGenerator] = [
+            lightGenerator,
+            mediumGenerator,
+            heavyGenerator,
+            softGenerator,
+            rigidGenerator,
+            selectionGenerator,
+            notificationGenerator
+        ]
+        for generator in generators {
+            generator.prepare()
+        }
+    }
+
     static func impact(_ style: Impact, intensity: CGFloat = 1) {
         guard isEnabled else { return }
-        let generator = UIImpactFeedbackGenerator(style: style.feedbackStyle)
-        generator.prepare()
+        let generator = generator(for: style)
         generator.impactOccurred(intensity: intensity)
+        generator.prepare()
     }
 
     static func selection() {
         guard isEnabled else { return }
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
+        selectionGenerator.selectionChanged()
+        selectionGenerator.prepare()
     }
 
     static func notify(_ type: Notification) {
         guard isEnabled else { return }
-        let generator = UINotificationFeedbackGenerator()
-        generator.prepare()
-        generator.notificationOccurred(type.feedbackType)
+        notificationGenerator.notificationOccurred(type.feedbackType)
+        notificationGenerator.prepare()
+    }
+
+    private static func generator(for style: Impact) -> UIImpactFeedbackGenerator {
+        switch style {
+        case .light: lightGenerator
+        case .medium: mediumGenerator
+        case .heavy: heavyGenerator
+        case .soft: softGenerator
+        case .rigid: rigidGenerator
+        }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - App mark
 
 struct AppLogoMark: View {
+    @Environment(\.gamePalette) private var palette
     var size: CGFloat = 42
 
     var body: some View {
@@ -10,7 +11,7 @@ struct AppLogoMark: View {
             RoundedRectangle(cornerRadius: size * 0.30, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Color(hex: 0x26374E), Color(hex: 0x0C131E)],
+                        colors: [palette.boardTop, palette.boardBottom],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -31,7 +32,7 @@ struct AppLogoMark: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Theme.gold.opacity(0.22), .clear],
+                        colors: [palette.flag.opacity(0.26), .clear],
                         center: .center,
                         startRadius: 0,
                         endRadius: size * 0.48
@@ -41,7 +42,7 @@ struct AppLogoMark: View {
 
             Image(systemName: "flag.fill")
                 .font(.system(size: size * 0.43, weight: .black))
-                .foregroundStyle(Theme.goldGradient)
+                .foregroundStyle(palette.flagGradient)
                 .shadow(color: Color.black.opacity(0.28), radius: 2, x: 0, y: 1.5)
 
 
@@ -54,6 +55,7 @@ struct AppLogoMark: View {
 // MARK: - Buttons
 
 struct GlassIconButton: View {
+    @Environment(\.gamePalette) private var palette
     let systemImage: String
     let accessibilityLabel: String
     var identifier: String? = nil
@@ -63,7 +65,7 @@ struct GlassIconButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(palette.ink)
                 .frame(width: 42, height: 42)
                 .contentShape(.circle)
         }
@@ -75,21 +77,23 @@ struct GlassIconButton: View {
 }
 
 struct GoldButtonStyle: ButtonStyle {
+    let palette: GamePalette
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.gameRounded(17, weight: .bold))
-            .foregroundStyle(Color(hex: 0x24190A))
+            .foregroundStyle(palette.onAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background {
                 Capsule(style: .continuous)
-                    .fill(Theme.goldGradient)
+                    .fill(palette.accentGradient)
             }
             .overlay {
                 Capsule(style: .continuous)
                     .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.7)
             }
-            .shadow(color: Theme.goldDeep.opacity(0.32), radius: 16, x: 0, y: 8)
+            .shadow(color: palette.accentDeep.opacity(0.32), radius: 16, x: 0, y: 8)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.snappy(duration: 0.18), value: configuration.isPressed)
     }
@@ -98,29 +102,31 @@ struct GoldButtonStyle: ButtonStyle {
 // MARK: - Small labels
 
 struct EyebrowLabel: View {
+    @Environment(\.gamePalette) private var palette
     let text: String
-    var color: Color = Theme.secondaryInk
+    var color: Color?
 
     var body: some View {
         Text(text.uppercased())
             .font(.gameRounded(9, weight: .bold))
             .tracking(2.2)
-            .foregroundStyle(color)
+            .foregroundStyle(color ?? palette.secondaryInk)
     }
 }
 
 struct BestTimeBadge: View {
+    @Environment(\.gamePalette) private var palette
     let seconds: Int?
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "trophy.fill")
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Theme.goldDeep)
+                .foregroundStyle(palette.accentDeep)
 
             Text(seconds.map { "最佳 \(TimeFormat.clock($0))" } ?? "暂无纪录")
                 .font(.gameRounded(11, weight: .semibold))
-                .foregroundStyle(Theme.secondaryInk)
+                .foregroundStyle(palette.secondaryInk)
                 .contentTransition(.numericText())
         }
         .accessibilityElement(children: .combine)

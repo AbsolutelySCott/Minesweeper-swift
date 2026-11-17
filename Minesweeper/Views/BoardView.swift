@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct BoardView: View {
+    @Environment(\.gamePalette) private var palette
     let game: MinesweeperGame
     let isFlagMode: Bool
     let bestSeconds: Int?
@@ -18,6 +19,12 @@ struct BoardView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var zoomScale: CGFloat = 1
+    @GestureState private var pinchMagnification: CGFloat = 1
+
+    private let minimumZoom: CGFloat = 1
+    private let maximumZoom: CGFloat = 3
 
     private var cardShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
@@ -46,7 +53,7 @@ struct BoardView: View {
                 LinearGradient(
                     colors: [
                         Color.white.opacity(0.18),
-                        Theme.gold.opacity(0.13),
+                        palette.accent.opacity(0.13),
                         Color.white.opacity(0.025)
                     ],
                     startPoint: .topLeading,
@@ -56,6 +63,12 @@ struct BoardView: View {
             )
         }
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.36 : 0.22), radius: 26, x: 0, y: 18)
+        .overlay(alignment: .bottomTrailing) {
+            if !isResultVisible {
+                zoomResetButton
+                    .padding(14)
+            }
+        }
         .animation(reduceMotion ? nil : .spring(duration: 0.42, bounce: 0.18), value: isResultVisible)
         .accessibilityElement(children: .contain)
     }
@@ -80,20 +93,20 @@ struct BoardView: View {
     private var boardSurface: some View {
         ZStack {
             LinearGradient(
-                colors: [Theme.boardTop, Theme.boardBottom],
+                colors: [palette.boardTop, palette.boardBottom],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
             RadialGradient(
-                colors: [Theme.gold.opacity(0.09), .clear],
+                colors: [palette.accent.opacity(0.09), .clear],
                 center: .topLeading,
                 startRadius: 0,
                 endRadius: 380
             )
 
             RadialGradient(
-                colors: [Theme.mint.opacity(0.05), .clear],
+                colors: [palette.mint.opacity(0.05), .clear],
                 center: .bottomTrailing,
                 startRadius: 0,
                 endRadius: 360
@@ -123,27 +136,27 @@ struct BoardView: View {
                 Text("雷区")
                     .font(.gameRounded(10.5, weight: .bold))
                     .tracking(1.6)
-                    .foregroundStyle(Theme.boardText.opacity(0.92))
+                    .foregroundStyle(palette.boardText.opacity(0.92))
 
                 Text(game.configuration.sizeLabel)
                     .font(.gameMono(9, weight: .medium))
-                    .foregroundStyle(Theme.boardSecondaryText.opacity(0.8))
+                    .foregroundStyle(palette.boardSecondaryText.opacity(0.8))
 
                 if game.configuration.columns > 20 {
                     HStack(spacing: 3) {
                         Image(systemName: "hand.draw.fill")
                             .font(.system(size: 8, weight: .semibold))
-                        Text("拖动查看")
+                        Text("拖动 · 双指缩放")
                             .font(.gameRounded(8.5, weight: .semibold))
                     }
-                    .foregroundStyle(Theme.boardSecondaryText.opacity(0.72))
+                    .foregroundStyle(palette.boardSecondaryText.opacity(0.72))
                 }
 
                 Spacer(minLength: 8)
 
                 Text(statusText)
                     .font(.gameRounded(10, weight: .semibold))
-                    .foregroundStyle(Theme.boardSecondaryText)
+                    .foregroundStyle(palette.boardSecondaryText)
                     .contentTransition(.numericText(countsDown: false))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -152,7 +165,7 @@ struct BoardView: View {
                     Button(action: onEnterFullScreen) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Theme.boardText.opacity(0.82))
+                            .foregroundStyle(palette.boardText.opacity(0.82))
                             .frame(width: 28, height: 28)
                             .contentShape(.circle)
                             .background {
@@ -179,7 +192,7 @@ struct BoardView: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [Theme.gold, Theme.mint],
+                                colors: [palette.accent, palette.mint],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -198,70 +211,133 @@ struct BoardView: View {
     }
 
     private func boardViewport(layout: BoardLayout, viewport: CGSize) -> some View {
-        ScrollView([.horizontal, .vertical]) {
-            interactiveBoardGrid(layout: layout)
-                .padding(layout.inset)
-                .frame(
-                    minWidth: viewport.width,
-                    minHeight: viewport.height
-                )
+        let geometry = zoomedGeometry(layout: layout)
+        let previewScale = effectiveZoom / zoomScale
+        let content = interactiveBoardGrid(geometry: geometry)
+            .scaleEffect(previewScale, anchor: .center)
+            .padding(layout.inset)
+            .frame(
+                minWidth: viewport.width,
+                minHeight: viewport.height
+            )
+
+        return ScrollView([.horizontal, .vertical]) {
+            content
         }
+        .id(zoomScale)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
-        .scrollDisabled(!layout.isScrollable)
         .defaultScrollAnchor(.center)
+        .simultaneousGesture(zoomGesture)
+        .onChange(of: game.id) { _, _ in
+            zoomScale = 1
+        }
         .accessibilityIdentifier("board")
         .accessibilityLabel("扫雷棋盘")
         .accessibilityHint(
             layout.isScrollable
-                ? "棋盘较大，可以拖动查看。轻点方格翻开，长按方格插旗。"
-                : "轻点方格翻开，长按方格插旗。"
+                ? "棋盘较大，可以拖动查看，也可以双指缩放。轻点方格翻开，长按方格插旗。"
+                : "可以双指缩放棋盘。轻点方格翻开，长按方格插旗。"
         )
     }
 
-    private func interactiveBoardGrid(layout: BoardLayout) -> some View {
-        boardGrid(layout: layout)
-            // Rasterize the many tile shapes into one layer so scrolling the
-            // 480-cell expert board stays smooth on phones.
-            .drawingGroup()
-            .overlay {
-                BoardInteractionLayer(
-                    columns: game.configuration.columns,
-                    rows: game.configuration.rows,
-                    tileSide: layout.tile,
-                    spacing: layout.gap,
-                    onTap: handleTap,
-                    onLongPress: handleLongPress
-                )
-                .accessibilityHidden(true)
+    private var effectiveZoom: CGFloat {
+        min(max(zoomScale * pinchMagnification, minimumZoom), maximumZoom)
+    }
+
+    private var zoomGesture: some Gesture {
+        MagnifyGesture(minimumScaleDelta: 0.01)
+            .updating($pinchMagnification) { value, state, _ in
+                state = value.magnification
+            }
+            .onEnded { value in
+                zoomScale = min(max(zoomScale * value.magnification, minimumZoom), maximumZoom)
             }
     }
 
-    private func boardGrid(layout: BoardLayout) -> some View {
-        VStack(spacing: layout.gap) {
-            ForEach(0..<game.configuration.rows, id: \.self) { row in
-                HStack(spacing: layout.gap) {
-                    ForEach(0..<game.configuration.columns, id: \.self) { column in
-                        let index = game.configuration.index(row: row, column: column)
-
-                        TileView(
-                            cell: game.cells[index],
-                            row: row,
-                            column: column,
-                            side: layout.tile,
-                            isGameActive: !game.status.isOver,
-                            isFlagMode: isFlagMode,
-                            onAccessibilityActivate: {
-                                handleTap(at: index)
-                            },
-                            onAccessibilityAlternate: {
-                                handleLongPress(at: index)
-                            }
-                        )
-                    }
+    @ViewBuilder
+    private var zoomResetButton: some View {
+        if effectiveZoom > 1.01 {
+            Button {
+                Haptics.selection()
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
+                    zoomScale = 1
                 }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("\(Int((effectiveZoom * 100).rounded()))%")
+                        .font(.gameMono(10, weight: .bold))
+                }
+                .foregroundStyle(palette.boardText.opacity(0.9))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(palette.boardInner.opacity(0.92))
+                }
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.7)
+                }
+                .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 4)
             }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("重置缩放")
+            .accessibilityValue("\(Int((effectiveZoom * 100).rounded()))%")
+            .accessibilityHint("轻点恢复适应棋盘大小")
+            .accessibilityIdentifier("zoom-reset")
+            .transition(.scale(scale: 0.9).combined(with: .opacity))
         }
+    }
+
+    private func zoomedGeometry(layout: BoardLayout) -> BoardZoomGeometry {
+        let scale = zoomScale
+        let tile = layout.tile * scale
+        let gap = layout.gap * scale
+        let columns = game.configuration.columns
+        let rows = game.configuration.rows
+        let size = CGSize(
+            width: CGFloat(columns) * tile + CGFloat(columns - 1) * gap,
+            height: CGFloat(rows) * tile + CGFloat(rows - 1) * gap
+        )
+        return BoardZoomGeometry(tile: tile, gap: gap, contentSize: size)
+    }
+
+    private func interactiveBoardGrid(geometry: BoardZoomGeometry) -> some View {
+        ZStack(alignment: .topLeading) {
+            BoardCanvas(
+                cells: game.cells,
+                configuration: game.configuration,
+                tile: geometry.tile,
+                spacing: geometry.gap
+            )
+
+            BoardAccessibilityGrid(
+                cells: game.cells,
+                configuration: game.configuration,
+                tile: geometry.tile,
+                spacing: geometry.gap,
+                isGameActive: !game.status.isOver,
+                isFlagMode: isFlagMode,
+                onActivate: { index in handleTap(at: index) },
+                onAlternate: { index in handleLongPress(at: index) }
+            )
+
+            BoardInteractionLayer(
+                columns: game.configuration.columns,
+                rows: game.configuration.rows,
+                tileSide: geometry.tile,
+                spacing: geometry.gap,
+                onTap: handleTap,
+                onLongPress: handleLongPress
+            )
+            .accessibilityHidden(true)
+        }
+        .frame(width: geometry.contentSize.width, height: geometry.contentSize.height)
         .accessibilityElement(children: .contain)
     }
 
@@ -319,10 +395,10 @@ struct BoardView: View {
 
     private var statusTint: Color {
         switch game.status {
-        case .ready: Theme.gold
-        case .playing: Theme.mint
-        case .won: Theme.gold
-        case .lost: Theme.coral
+        case .ready: palette.accent
+        case .playing: palette.mint
+        case .won: palette.accent
+        case .lost: palette.coral
         }
     }
 
@@ -340,10 +416,17 @@ struct BoardView: View {
     }
 }
 
+private struct BoardZoomGeometry {
+    let tile: CGFloat
+    let gap: CGFloat
+    let contentSize: CGSize
+}
+
 private struct BoardLayout {
     let tile: CGFloat
     let gap: CGFloat
     let inset: CGFloat
+    let contentSize: CGSize
     let isScrollable: Bool
 
     init(configuration: BoardConfiguration, viewport: CGSize, edgeInset: CGFloat) {
@@ -366,6 +449,7 @@ private struct BoardLayout {
         tile = side
         self.gap = gap
         self.inset = inset
+        contentSize = CGSize(width: contentWidth, height: contentHeight)
         isScrollable = contentWidth + inset * 2 > viewport.width + 1
             || contentHeight + inset * 2 > viewport.height + 1
     }

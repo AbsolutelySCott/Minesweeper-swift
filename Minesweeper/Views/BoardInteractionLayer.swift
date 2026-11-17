@@ -30,6 +30,7 @@ struct BoardInteractionLayer: UIViewRepresentable {
         )
         tap.cancelsTouchesInView = false
         tap.delaysTouchesBegan = false
+        tap.numberOfTouchesRequired = 1
 
         let longPress = UILongPressGestureRecognizer(
             target: context.coordinator,
@@ -39,6 +40,7 @@ struct BoardInteractionLayer: UIViewRepresentable {
         longPress.allowableMovement = 12
         longPress.cancelsTouchesInView = false
         longPress.delaysTouchesBegan = false
+        longPress.numberOfTouchesRequired = 1
 
         view.addGestureRecognizer(tap)
         view.addGestureRecognizer(longPress)

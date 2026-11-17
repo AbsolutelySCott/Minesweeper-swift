@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HUDView: View {
+    @Environment(\.gamePalette) private var palette
     let game: MinesweeperGame
     let onReset: () -> Void
 
@@ -29,7 +30,7 @@ struct HUDView: View {
         Rectangle()
             .fill(
                 LinearGradient(
-                    colors: [.clear, Theme.ink.opacity(0.12), .clear],
+                    colors: [.clear, palette.ink.opacity(0.12), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -41,6 +42,7 @@ struct HUDView: View {
 }
 
 private struct MineCounter: View {
+    @Environment(\.gamePalette) private var palette
     let value: Int
 
     var body: some View {
@@ -48,16 +50,16 @@ private struct MineCounter: View {
             HStack(spacing: 5) {
                 Image(systemName: "flag.fill")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.goldDeep)
+                    .foregroundStyle(palette.flagDeep)
                 Text("剩余地雷")
                     .font(.gameRounded(9, weight: .bold))
                     .tracking(0.5)
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
             }
 
             Text(TimeFormat.counter(value))
                 .font(.gameMono(27, weight: .bold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(palette.ink)
                 .contentTransition(.numericText(countsDown: true))
                 .animation(.snappy(duration: 0.22), value: value)
                 .minimumScaleFactor(0.7)
@@ -70,6 +72,7 @@ private struct MineCounter: View {
 }
 
 private struct TimerCounter: View {
+    @Environment(\.gamePalette) private var palette
     let game: MinesweeperGame
 
     var body: some View {
@@ -90,15 +93,15 @@ private struct TimerCounter: View {
                 Text("用时")
                     .font(.gameRounded(9, weight: .bold))
                     .tracking(0.5)
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
                 Image(systemName: "timer")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.mint.opacity(0.9))
+                    .foregroundStyle(palette.mint.opacity(0.9))
             }
 
             Text(TimeFormat.clock(seconds))
                 .font(.gameMono(27, weight: .bold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(palette.ink)
                 .contentTransition(.numericText(countsDown: false))
                 .monospacedDigit()
                 .minimumScaleFactor(0.7)
@@ -111,6 +114,7 @@ private struct TimerCounter: View {
 }
 
 struct ResetFaceButton: View {
+    @Environment(\.gamePalette) private var palette
     let status: GameStatus
     let action: () -> Void
     var diameter: CGFloat = 51
@@ -132,7 +136,7 @@ struct ResetFaceButton: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color(hex: 0x314057), Color(hex: 0x101722)],
+                                colors: [palette.boardTop, palette.boardBottom],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -141,7 +145,7 @@ struct ResetFaceButton: View {
                             Circle()
                                 .strokeBorder(
                                     LinearGradient(
-                                        colors: [Theme.gold.opacity(0.7), Theme.goldDeep.opacity(0.18)],
+                                        colors: [palette.accent.opacity(0.7), palette.accentDeep.opacity(0.18)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     ),
@@ -169,6 +173,7 @@ private struct FacePressStyle: ButtonStyle {
 }
 
 struct GameFooter: View {
+    @Environment(\.gamePalette) private var palette
     let bestSeconds: Int?
     let isFlagMode: Bool
     let onToggleFlagMode: () -> Void
@@ -181,7 +186,7 @@ struct GameFooter: View {
 
             Text(isFlagMode ? "轻点插旗 · 长按翻开" : "轻点翻开 · 长按插旗")
                 .font(.gameRounded(10.5, weight: .medium))
-                .foregroundStyle(Theme.secondaryInk)
+                .foregroundStyle(palette.secondaryInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .accessibilityHidden(true)
@@ -196,16 +201,16 @@ struct GameFooter: View {
                         .font(.gameRounded(11, weight: .bold))
                         .lineLimit(1)
                 }
-                .foregroundStyle(isFlagMode ? Color(hex: 0x261A08) : Theme.secondaryInk)
+                .foregroundStyle(isFlagMode ? palette.onAccent : palette.secondaryInk)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background {
                     Capsule(style: .continuous)
-                        .fill(isFlagMode ? AnyShapeStyle(Theme.goldGradient) : AnyShapeStyle(.clear))
+                        .fill(isFlagMode ? AnyShapeStyle(palette.accentGradient) : AnyShapeStyle(.clear))
                 }
                 .overlay {
                     Capsule(style: .continuous)
-                        .strokeBorder(isFlagMode ? .clear : Theme.ink.opacity(0.13), lineWidth: 0.8)
+                        .strokeBorder(isFlagMode ? .clear : palette.ink.opacity(0.13), lineWidth: 0.8)
                 }
                 .contentShape(.capsule)
             }

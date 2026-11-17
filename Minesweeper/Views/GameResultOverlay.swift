@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct GameResultOverlay: View {
+    @Environment(\.gamePalette) private var palette
     let result: GameResult
     let bestSeconds: Int?
     let onReplay: () -> Void
@@ -12,7 +13,7 @@ struct GameResultOverlay: View {
     @State private var appeared = false
 
     private var tint: Color {
-        result.won ? Theme.gold : Theme.coral
+        result.won ? palette.accent : palette.coral
     }
 
     var body: some View {
@@ -49,29 +50,18 @@ struct GameResultOverlay: View {
             VStack(spacing: 6) {
                 Text(result.won ? "排雷成功" : "踩到地雷了")
                     .font(.gameRounded(26, weight: .bold))
-                    .foregroundStyle(Theme.boardText)
+                    .foregroundStyle(palette.boardText)
                     .accessibilityFocused($titleIsFocused)
                     .accessibilityAddTraits(.isHeader)
 
                 Text(result.won ? "整片雷区已经安全了" : "别泄气，再试一次")
                     .font(.gameRounded(12.5, weight: .medium))
-                    .foregroundStyle(Theme.boardSecondaryText)
+                    .foregroundStyle(palette.boardSecondaryText)
                     .multilineTextAlignment(.center)
             }
 
             if result.won && result.isNewBest {
-                HStack(spacing: 5) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 9, weight: .bold))
-                    Text("新纪录 · \(result.difficulty.title)")
-                        .font(.gameRounded(10.5, weight: .bold))
-                }
-                .foregroundStyle(Color(hex: 0x2B1C06))
-                .padding(.horizontal, 11)
-                .padding(.vertical, 5)
-                .background(Capsule(style: .continuous).fill(Theme.goldGradient))
-                .transition(.scale(scale: 0.8).combined(with: .opacity))
-                .accessibilityLabel("新的最佳成绩")
+                newRecordBadge
             }
 
             HStack(spacing: 10) {
@@ -91,7 +81,7 @@ struct GameResultOverlay: View {
                         Text("再来一局")
                     }
                 }
-                .buttonStyle(GoldButtonStyle())
+                .buttonStyle(primaryButtonStyle)
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("result-replay")
 
@@ -102,7 +92,7 @@ struct GameResultOverlay: View {
                         Text("查看棋盘")
                             .font(.gameRounded(13, weight: .semibold))
                     }
-                    .foregroundStyle(Theme.boardText.opacity(0.85))
+                    .foregroundStyle(palette.boardText.opacity(0.85))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
                     .background {
@@ -126,7 +116,7 @@ struct GameResultOverlay: View {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Color(hex: 0x1A2638), Color(hex: 0x0A111C)],
+                        colors: [palette.boardTop, palette.boardBottom],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -157,6 +147,28 @@ struct GameResultOverlay: View {
         .opacity(appeared ? 1 : 0)
     }
 
+    private var primaryButtonStyle: GoldButtonStyle {
+        GoldButtonStyle(palette: palette)
+    }
+
+    private var newRecordBadge: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 9, weight: .bold))
+            Text("新纪录 · \(result.difficulty.title)")
+                .font(.gameRounded(10.5, weight: .bold))
+        }
+        .foregroundStyle(palette.onAccent)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 5)
+        .background {
+            Capsule(style: .continuous)
+                .fill(palette.accentGradient)
+        }
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
+        .accessibilityLabel("新的最佳成绩")
+    }
+
     private var displayBestSeconds: Int? {
         if let bestSeconds { return bestSeconds }
         return result.won && result.isNewBest ? result.seconds : nil
@@ -178,7 +190,7 @@ struct GameResultOverlay: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [Color(hex: 0x2A3A51), Color(hex: 0x101723)],
+                        colors: [palette.boardTop, palette.boardBottom],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -230,12 +242,12 @@ struct GameResultOverlay: View {
                 Text(title)
                     .font(.gameRounded(9, weight: .bold))
                     .tracking(0.8)
-                    .foregroundStyle(Theme.boardSecondaryText)
+                    .foregroundStyle(palette.boardSecondaryText)
             }
 
             Text(value)
                 .font(.gameMono(19, weight: .bold))
-                .foregroundStyle(Theme.boardText)
+                .foregroundStyle(palette.boardText)
                 .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity)

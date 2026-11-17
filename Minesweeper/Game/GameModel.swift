@@ -30,6 +30,7 @@ final class GameModel {
         game = MinesweeperGame(configuration: savedDifficulty.configuration)
         stats = Self.loadStats(from: defaults)
         isFlagMode = defaults.object(forKey: Keys.flagMode) as? Bool ?? false
+        Haptics.prepare()
     }
 
     // MARK: - Game lifecycle

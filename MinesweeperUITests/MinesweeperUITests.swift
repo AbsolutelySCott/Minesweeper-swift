@@ -109,6 +109,90 @@ final class MinesweeperUITests: XCTestCase {
     }
 
     @MainActor
+    func testCreamGreenTheme() throws {
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))
+
+        app.buttons["stats-button"].tap()
+        XCTAssertTrue(app.staticTexts["战绩"].waitForExistence(timeout: 3))
+
+        let creamTheme = app.descendants(matching: .any)["theme-creamGreen"]
+        XCTAssertTrue(creamTheme.waitForExistence(timeout: 3))
+        creamTheme.tap()
+        attachScreenshot(app, name: "17-cream-green-stats")
+
+        app.buttons["sheet-close"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["sheet-close"].firstMatch.waitForNonExistence(timeout: 3))
+
+        let center = tile(in: app, row: 4, column: 4)
+        XCTAssertTrue(center.waitForExistence(timeout: 3))
+        center.tap()
+        let opened = NSPredicate(format: "value != '未翻开'")
+        expectation(for: opened, evaluatedWith: center)
+        waitForExpectations(timeout: 3)
+        attachScreenshot(app, name: "18-cream-green-board")
+    }
+
+    @MainActor
+    func testPhoneLandscapeLayout() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "Phone landscape layout is checked on iPhone.")
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        Thread.sleep(forTimeInterval: 2)
+
+        XCTAssertTrue(app.buttons["fullscreen-button"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["fullscreen-button"].isHittable)
+        XCTAssertTrue(app.buttons["stats-button"].isHittable)
+        XCTAssertTrue(app.buttons["flag-mode-toggle"].isHittable)
+        XCTAssertTrue(app.buttons["face-button"].isHittable)
+
+        let board = app.scrollViews["board"]
+        XCTAssertTrue(board.waitForExistence(timeout: 3))
+        let center = tile(in: app, row: 4, column: 4)
+        XCTAssertTrue(center.isHittable)
+        center.tap()
+        let opened = NSPredicate(format: "value != '未翻开'")
+        expectation(for: opened, evaluatedWith: center)
+        waitForExpectations(timeout: 3)
+
+        attachScreenshot(app, name: "15-phone-landscape")
+
+        app.buttons["fullscreen-button"].tap()
+        XCTAssertTrue(app.buttons["fullscreen-exit"].waitForExistence(timeout: 3))
+        attachScreenshot(app, name: "16-phone-landscape-fullscreen")
+        app.buttons["fullscreen-exit"].tap()
+    }
+
+    @MainActor
+    func testPinchZoomAndReset() throws {
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))
+
+        let board = app.scrollViews["board"]
+        XCTAssertTrue(board.waitForExistence(timeout: 3))
+        board.pinch(withScale: 2.0, velocity: 1.0)
+
+        let reset = app.descendants(matching: .any)["zoom-reset"]
+        XCTAssertTrue(reset.waitForExistence(timeout: 3))
+        attachScreenshot(app, name: "14-pinch-zoomed")
+
+        let target = tile(in: app, row: 4, column: 4)
+        XCTAssertTrue(target.waitForExistence(timeout: 2))
+        XCTAssertTrue(target.isHittable)
+        target.tap()
+
+        let opened = NSPredicate(format: "value != '未翻开'")
+        expectation(for: opened, evaluatedWith: target)
+        waitForExpectations(timeout: 3)
+
+        reset.tap()
+        XCTAssertTrue(reset.waitForNonExistence(timeout: 3))
+    }
+
+    @MainActor
     func testFullScreenMode() throws {
         let app = launchApp()
         XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))

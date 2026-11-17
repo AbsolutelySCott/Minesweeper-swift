@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DifficultySelector: View {
+    @Environment(\.gamePalette) private var palette
     let selection: Difficulty
     let onSelect: (Difficulty) -> Void
 
@@ -17,16 +18,16 @@ struct DifficultySelector: View {
                 } label: {
                     Text(difficulty.title)
                         .font(.gameRounded(14, weight: .bold))
-                        .foregroundStyle(isSelected ? Color(hex: 0x2A1D09) : Theme.secondaryInk)
+                        .foregroundStyle(isSelected ? palette.onAccent : palette.secondaryInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
                         .contentShape(.capsule)
                         .background {
                             if isSelected {
                                 Capsule(style: .continuous)
-                                    .fill(Theme.goldGradient)
+                                    .fill(palette.accentGradient)
                                     .matchedGeometryEffect(id: "selectedDifficulty", in: selectionNamespace)
-                                    .shadow(color: Theme.goldDeep.opacity(0.28), radius: 6, x: 0, y: 3)
+                                    .shadow(color: palette.accentDeep.opacity(0.28), radius: 6, x: 0, y: 3)
                             }
                         }
                 }

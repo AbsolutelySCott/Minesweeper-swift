@@ -8,9 +8,21 @@ struct GameScreen: View {
     @State private var isFullScreen = false
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(AppTheme.storageKey) private var themeRawValue = AppTheme.midnightGold.rawValue
 
     private var isRegularWidth: Bool { horizontalSizeClass == .regular }
+    private var selectedTheme: AppTheme {
+        AppTheme(rawValue: themeRawValue) ?? .midnightGold
+    }
+    private var palette: GamePalette {
+        GamePalette(theme: selectedTheme, scheme: colorScheme)
+    }
+    private var usesPhoneLandscape: Bool {
+        horizontalSizeClass == .compact && verticalSizeClass == .compact
+    }
 
     var body: some View {
         ZStack {
@@ -24,22 +36,34 @@ struct GameScreen: View {
                     .transition(.opacity)
             }
         }
+        .environment(\.gamePalette, palette)
         .statusBarHidden(isFullScreen)
         .sheet(isPresented: $showsStats) {
             StatsSheet(model: model)
+                .environment(\.gamePalette, palette)
         }
         .sheet(isPresented: $showsHelp) {
             HelpSheet()
+                .environment(\.gamePalette, palette)
         }
         .task(id: resultTaskID) {
             await presentResultIfNeeded()
         }
-        .tint(Theme.goldDeep)
+        .tint(palette.accentDeep)
     }
 
     // MARK: - Layouts
 
+    @ViewBuilder
     private var standardLayout: some View {
+        if usesPhoneLandscape {
+            landscapeLayout
+        } else {
+            portraitLayout
+        }
+    }
+
+    private var portraitLayout: some View {
         VStack(spacing: isRegularWidth ? 15 : 11) {
             header
                 .frame(maxWidth: isRegularWidth ? 700 : .infinity)
@@ -54,11 +78,16 @@ struct GameScreen: View {
             }
             .frame(maxWidth: isRegularWidth ? 700 : .infinity)
 
-            board(fullScreen: false)
-                .frame(
-                    maxWidth: isRegularWidth ? boardWidth : .infinity,
-                    maxHeight: isRegularWidth ? boardHeight : .infinity
-                )
+            gameBoard(
+                showsHeader: true,
+                edgeInset: 12,
+                cornerRadius: 30,
+                onEnterFullScreen: { enterFullScreen() }
+            )
+            .frame(
+                maxWidth: isRegularWidth ? boardWidth : .infinity,
+                maxHeight: isRegularWidth ? boardHeight : .infinity
+            )
 
             GameFooter(
                 bestSeconds: model.currentBestSeconds,
@@ -73,6 +102,34 @@ struct GameScreen: View {
         .frame(maxWidth: 1040, maxHeight: .infinity)
     }
 
+    private var landscapeLayout: some View {
+        HStack(spacing: 10) {
+            LandscapeSidebar(
+                game: model.game,
+                difficulty: model.difficulty,
+                bestSeconds: model.currentBestSeconds,
+                isFlagMode: model.isFlagMode,
+                onSelectDifficulty: { model.selectDifficulty($0) },
+                onReset: { model.startNewGame() },
+                onToggleFlagMode: toggleFlagMode,
+                onShowStats: { showsStats = true },
+                onShowHelp: { showsHelp = true },
+                onEnterFullScreen: enterFullScreen
+            )
+
+            gameBoard(
+                showsHeader: false,
+                edgeInset: 8,
+                cornerRadius: 24,
+                onEnterFullScreen: nil
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(maxWidth: 1100, maxHeight: .infinity)
+    }
+
     private var fullScreenLayout: some View {
         VStack(spacing: 8) {
             FullScreenHUD(
@@ -85,11 +142,16 @@ struct GameScreen: View {
             )
             .frame(maxWidth: isRegularWidth ? 760 : .infinity)
 
-            board(fullScreen: true)
-                .frame(
-                    maxWidth: isRegularWidth ? fullScreenBoardWidth : .infinity,
-                    maxHeight: isRegularWidth ? fullScreenBoardHeight : .infinity
-                )
+            gameBoard(
+                showsHeader: false,
+                edgeInset: usesPhoneLandscape ? 6 : 8,
+                cornerRadius: 24,
+                onEnterFullScreen: nil
+            )
+            .frame(
+                maxWidth: isRegularWidth ? fullScreenBoardWidth : .infinity,
+                maxHeight: isRegularWidth ? fullScreenBoardHeight : .infinity
+            )
         }
         .padding(.horizontal, isRegularWidth ? 16 : 8)
         .padding(.top, 2)
@@ -97,7 +159,12 @@ struct GameScreen: View {
         .frame(maxWidth: 1280, maxHeight: .infinity)
     }
 
-    private func board(fullScreen: Bool) -> some View {
+    private func gameBoard(
+        showsHeader: Bool,
+        edgeInset: CGFloat,
+        cornerRadius: CGFloat,
+        onEnterFullScreen: (() -> Void)?
+    ) -> some View {
         BoardView(
             game: model.game,
             isFlagMode: model.isFlagMode,
@@ -108,10 +175,10 @@ struct GameScreen: View {
             onSecondaryAction: { model.secondaryTap(at: $0) },
             onReplay: replay,
             onInspectBoard: inspectBoard,
-            showsHeader: !fullScreen,
-            edgeInset: fullScreen ? 8 : 12,
-            cardCornerRadius: fullScreen ? 24 : 30,
-            onEnterFullScreen: fullScreen ? nil : { enterFullScreen() }
+            showsHeader: showsHeader,
+            edgeInset: edgeInset,
+            cardCornerRadius: cornerRadius,
+            onEnterFullScreen: onEnterFullScreen
         )
     }
 
@@ -122,17 +189,17 @@ struct GameScreen: View {
             AppLogoMark(size: 43)
 
             VStack(alignment: .leading, spacing: 0) {
-                EyebrowLabel(text: "Minesweeper", color: Theme.tertiaryInk)
+                EyebrowLabel(text: "Minesweeper", color: palette.tertiaryInk)
                     .accessibilityHidden(true)
 
                 Text("扫雷")
                     .font(.gameRounded(26, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(palette.ink)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("\(model.difficulty.title) · \(model.difficulty.summary)")
                     .font(.gameRounded(10.5, weight: .medium))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
                     .padding(.top, 1)
                     .contentTransition(.opacity)
             }

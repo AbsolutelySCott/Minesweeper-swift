@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HelpSheet: View {
+    @Environment(\.gamePalette) private var palette
     @State private var detent: PresentationDetent = .large
 
     var body: some View {
@@ -24,11 +25,11 @@ struct HelpSheet: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text("找出全部地雷")
                     .font(.gameRounded(19, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(palette.ink)
 
                 Text("数字代表它周围八格中地雷的数量。标出全部地雷，并翻开其余所有安全方格，就能赢下这一局。")
                     .font(.gameRounded(12.5, weight: .regular))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -73,6 +74,15 @@ struct HelpSheet: View {
                 title: "快速翻开",
                 detail: "当数字周围的旗子数量与数字一致时，轻点该数字，可一次翻开周围的方格。"
             )
+
+            stepDivider
+
+            helpStep(
+                number: 5,
+                icon: "arrow.up.left.and.arrow.down.right",
+                title: "缩放与全屏",
+                detail: "双指捏合缩放棋盘，单指拖动查看。点击棋盘右上角的展开按钮进入全屏，横屏也能玩。"
+            )
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 6)
@@ -83,16 +93,16 @@ struct HelpSheet: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "shield.lefthalf.filled")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.mint)
+                .foregroundStyle(palette.mint)
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("安全的第一次点击")
                     .font(.gameRounded(12, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(palette.ink)
                 Text("每局开始时，第一次点击的位置及其周围八格永远不会布雷，让你总能安全开局。")
                     .font(.gameRounded(11.5, weight: .regular))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
                     .lineSpacing(2)
             }
         }
@@ -100,11 +110,11 @@ struct HelpSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Theme.mint.opacity(0.09))
+                .fill(palette.mint.opacity(0.09))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Theme.mint.opacity(0.16), lineWidth: 0.8)
+                .strokeBorder(palette.mint.opacity(0.16), lineWidth: 0.8)
         }
     }
 
@@ -112,10 +122,10 @@ struct HelpSheet: View {
         HStack(spacing: 8) {
             Image(systemName: "hand.point.up.left.fill")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Theme.tertiaryInk)
+                .foregroundStyle(palette.tertiaryInk)
             Text("提示：标记模式更适合大棋盘，单手也能轻松插旗。")
                 .font(.gameRounded(10.5, weight: .medium))
-                .foregroundStyle(Theme.tertiaryInk)
+                .foregroundStyle(palette.tertiaryInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
@@ -126,26 +136,26 @@ struct HelpSheet: View {
         HStack(alignment: .top, spacing: 13) {
             ZStack {
                 Circle()
-                    .fill(Theme.gold.opacity(0.13))
+                    .fill(palette.accent.opacity(0.13))
                     .frame(width: 34, height: 34)
                 Image(systemName: icon)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.goldDeep)
+                    .foregroundStyle(palette.accentDeep)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(String(format: "%02d", number))
                         .font(.gameMono(8.5, weight: .bold))
-                        .foregroundStyle(Theme.tertiaryInk)
+                        .foregroundStyle(palette.tertiaryInk)
                     Text(title)
                         .font(.gameRounded(13.5, weight: .bold))
-                        .foregroundStyle(Theme.ink)
+                        .foregroundStyle(palette.ink)
                 }
 
                 Text(detail)
                     .font(.gameRounded(11.5, weight: .regular))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
                     .lineSpacing(2.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -158,7 +168,7 @@ struct HelpSheet: View {
 
     private var stepDivider: some View {
         Rectangle()
-            .fill(Theme.ink.opacity(0.07))
+            .fill(palette.ink.opacity(0.07))
             .frame(height: 0.7)
             .padding(.leading, 47)
             .accessibilityHidden(true)
@@ -166,6 +176,7 @@ struct HelpSheet: View {
 }
 
 private struct MiniBoardDemo: View {
+    @Environment(\.gamePalette) private var palette
     private let tiles: [[String?]] = [
         ["1", "1", "1"],
         ["1", nil, "1"],
@@ -187,7 +198,7 @@ private struct MiniBoardDemo: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Theme.boardTop, Theme.boardBottom],
+                        colors: [palette.boardTop, palette.boardBottom],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -208,18 +219,18 @@ private struct MiniBoardDemo: View {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(
                     value == nil
-                        ? AnyShapeStyle(LinearGradient(colors: [Theme.hiddenTop, Theme.hiddenBottom], startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(LinearGradient(colors: [Theme.revealedTop, Theme.revealedBottom], startPoint: .top, endPoint: .bottom))
+                        ? AnyShapeStyle(LinearGradient(colors: [palette.hiddenTop, palette.hiddenBottom], startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(LinearGradient(colors: [palette.revealedTop, palette.revealedBottom], startPoint: .top, endPoint: .bottom))
                 )
 
             if let value {
                 Text(value)
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Theme.number(1))
+                    .foregroundStyle(palette.number(1))
             } else {
                 Image(systemName: "flag.fill")
                     .font(.system(size: 12, weight: .black))
-                    .foregroundStyle(Theme.goldGradient)
+                    .foregroundStyle(palette.flagGradient)
             }
         }
         .frame(width: 28, height: 28)
