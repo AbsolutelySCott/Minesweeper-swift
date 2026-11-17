@@ -1,16 +1,23 @@
 import SwiftUI
+import UIKit
 
 /// The compact controls that stay on screen while the board is in full-screen
 /// mode. Everything non-essential is hidden so the board gets as much room as
 /// possible.
 struct FullScreenHUD: View {
     @Environment(\.gamePalette) private var palette
+
+    private var supportsOrientationToggle: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     let game: MinesweeperGame
     let difficulty: Difficulty
     let isFlagMode: Bool
     let onExit: () -> Void
     let onReset: () -> Void
     let onToggleFlagMode: () -> Void
+    let onToggleOrientation: () -> Void
 
     var body: some View {
         HStack(spacing: 9) {
@@ -31,6 +38,26 @@ struct FullScreenHUD: View {
             .accessibilityLabel("退出全屏模式")
             .accessibilityHint("恢复难度、战绩和玩法按钮")
             .accessibilityIdentifier("fullscreen-exit")
+
+            if supportsOrientationToggle {
+                Button(action: onToggleOrientation) {
+                    Image(systemName: "rectangle.landscape.rotate")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                        .frame(width: 33, height: 33)
+                        .contentShape(.circle)
+                        .background {
+                            Circle().fill(palette.ink.opacity(0.06))
+                        }
+                        .overlay {
+                            Circle().strokeBorder(palette.ink.opacity(0.10), lineWidth: 0.7)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("切换横竖屏")
+                .accessibilityHint("在横屏与竖屏全屏布局之间切换")
+                .accessibilityIdentifier("fullscreen-orientation")
+            }
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(difficulty.title)
@@ -95,6 +122,11 @@ struct FullScreenHUD: View {
 
 struct CompactTimer: View {
     @Environment(\.gamePalette) private var palette
+
+    private var supportsOrientationToggle: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     let game: MinesweeperGame
 
     var body: some View {

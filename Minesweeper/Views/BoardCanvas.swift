@@ -30,13 +30,22 @@ struct BoardCanvas: View {
             for row in 0..<configuration.rows {
                 for column in 0..<configuration.columns {
                     let index = configuration.index(row: row, column: column)
+                    let cell = cells[index]
+
+                    // Plain hidden tiles are painted once by the equatable
+                    // backplate below. This canvas only repaints cells whose
+                    // state differs from that backplate.
+                    guard cell.isRevealed || cell.isFlagged || cell.isExploded else {
+                        continue
+                    }
+
                     let rect = CGRect(
                         x: CGFloat(column) * (tile + spacing),
                         y: CGFloat(row) * (tile + spacing),
                         width: tile,
                         height: tile
                     )
-                    draw(cell: cells[index], in: rect, context: &context)
+                    draw(cell: cell, in: rect, context: &context)
                 }
             }
         }
@@ -57,9 +66,10 @@ struct BoardCanvas: View {
             return
         }
 
-        drawHidden(shape: shape, rect: rect, context: &context)
-
         if cell.isFlagged {
+            // The flag cell is opaque so it completely covers the hidden
+            // backplate underneath.
+            drawHidden(shape: shape, rect: rect, context: &context)
             drawFlag(in: rect, context: &context)
             if cell.isWrongFlag {
                 drawWrongBadge(in: rect, context: &context)
@@ -68,15 +78,10 @@ struct BoardCanvas: View {
     }
 
     private func drawHidden(shape: Path, rect: CGRect, context: inout GraphicsContext) {
-        let colors = [palette.hiddenTop, palette.hiddenBottom]
-        context.fill(
-            shape,
-            with: .linearGradient(
-                Gradient(colors: colors),
-                startPoint: CGPoint(x: rect.minX, y: rect.minY),
-                endPoint: CGPoint(x: rect.maxX, y: rect.maxY)
-            )
-        )
+        // A flat fill is deliberately used here instead of a per-tile gradient.
+        // It removes hundreds of gradient shadings from every reveal while the
+        // stroke and glass highlight keep the tiles readable.
+        context.fill(shape, with: .color(palette.hiddenFill))
         context.stroke(shape, with: .color(Color.white.opacity(0.10)), lineWidth: 0.6)
 
         if tile >= 26 {
@@ -95,18 +100,7 @@ struct BoardCanvas: View {
     }
 
     private func drawRevealed(cell: Cell, rect: CGRect, shape: Path, context: inout GraphicsContext) {
-        if tile >= 30 {
-            context.fill(
-                shape,
-                with: .linearGradient(
-                    Gradient(colors: [palette.revealedTop, palette.revealedBottom]),
-                    startPoint: CGPoint(x: rect.midX, y: rect.minY),
-                    endPoint: CGPoint(x: rect.midX, y: rect.maxY)
-                )
-            )
-        } else {
-            context.fill(shape, with: .color(palette.revealedTop))
-        }
+        context.fill(shape, with: .color(palette.revealedFill))
         context.stroke(shape, with: .color(palette.revealedStroke), lineWidth: 0.5)
 
         if cell.hasMine {
@@ -192,5 +186,71 @@ struct BoardCanvas: View {
         cross.move(to: CGPoint(x: badgeRect.maxX - inset, y: badgeRect.minY + inset))
         cross.addLine(to: CGPoint(x: badgeRect.minX + inset, y: badgeRect.maxY - inset))
         context.stroke(cross, with: .color(.white), style: StrokeStyle(lineWidth: max(1, badgeDiameter * 0.14), lineCap: .round))
+    }
+}
+
+
+/// Paints every cell as an untouched hidden tile. Because this view has no
+/// dependency on the cell states, SwiftUI can keep its canvas cached across
+/// reveals; the smaller overlay above only redraws cells that changed.
+struct BoardHiddenCanvas: View, Equatable {
+    @Environment(\.gamePalette) private var palette
+    let columns: Int
+    let rows: Int
+    let tile: CGFloat
+    let spacing: CGFloat
+    let themeToken: String
+
+    private var cornerRadius: CGFloat {
+        min(9, max(2.5, tile * 0.17))
+    }
+
+    private var contentSize: CGSize {
+        CGSize(
+            width: CGFloat(columns) * tile + CGFloat(columns - 1) * spacing,
+            height: CGFloat(rows) * tile + CGFloat(rows - 1) * spacing
+        )
+    }
+
+    nonisolated static func == (lhs: BoardHiddenCanvas, rhs: BoardHiddenCanvas) -> Bool {
+        lhs.columns == rhs.columns
+            && lhs.rows == rhs.rows
+            && lhs.tile == rhs.tile
+            && lhs.spacing == rhs.spacing
+            && lhs.themeToken == rhs.themeToken
+    }
+
+    var body: some View {
+        Canvas(rendersAsynchronously: false) { context, _ in
+            for row in 0..<rows {
+                for column in 0..<columns {
+                    let rect = CGRect(
+                        x: CGFloat(column) * (tile + spacing),
+                        y: CGFloat(row) * (tile + spacing),
+                        width: tile,
+                        height: tile
+                    )
+                    let shape = Path(roundedRect: rect, cornerRadius: cornerRadius)
+                    context.fill(shape, with: .color(palette.hiddenFill))
+                    context.stroke(shape, with: .color(Color.white.opacity(0.10)), lineWidth: 0.6)
+
+                    if tile >= 26 {
+                        let highlightRect = CGRect(
+                            x: rect.minX + tile * 0.12,
+                            y: rect.minY + tile * 0.12,
+                            width: tile * 0.52,
+                            height: max(1, tile * 0.09)
+                        )
+                        let highlight = Path(
+                            roundedRect: highlightRect,
+                            cornerRadius: highlightRect.height / 2
+                        )
+                        context.fill(highlight, with: .color(Color.white.opacity(0.05)))
+                    }
+                }
+            }
+        }
+        .frame(width: contentSize.width, height: contentSize.height)
+        .accessibilityHidden(true)
     }
 }

@@ -96,9 +96,11 @@ struct GamePalette {
 
     let hiddenTop: Color
     let hiddenBottom: Color
+    let hiddenFill: Color
     let hiddenStroke: Color
     let revealedTop: Color
     let revealedBottom: Color
+    let revealedFill: Color
     let revealedStroke: Color
 
     let backgroundBase: Color
@@ -143,9 +145,11 @@ struct GamePalette {
 
             hiddenTop = Color(hex: 0x3D4B62)
             hiddenBottom = Color(hex: 0x273245)
+            hiddenFill = Color(hex: 0x334055)
             hiddenStroke = Color(hex: 0x687B97)
             revealedTop = Color(hex: 0x192434)
             revealedBottom = Color(hex: 0x101924)
+            revealedFill = Color(hex: 0x151F2E)
             revealedStroke = Color.white.opacity(0.07)
 
             backgroundBase = Color(hex: isDark ? 0x05080E : 0xF2EDE4)
@@ -203,9 +207,11 @@ struct GamePalette {
 
             hiddenTop = Color(hex: isDark ? 0x455A49 : 0x536B57)
             hiddenBottom = Color(hex: isDark ? 0x2C3A30 : 0x3A4C3D)
+            hiddenFill = Color(hex: isDark ? 0x3E5242 : 0x495F4D)
             hiddenStroke = Color(hex: 0x83987F)
             revealedTop = Color(hex: isDark ? 0x1A281E : 0x233428)
             revealedBottom = Color(hex: isDark ? 0x111B15 : 0x18241B)
+            revealedFill = Color(hex: isDark ? 0x18241B : 0x1E2D22)
             revealedStroke = Color.white.opacity(0.06)
 
             backgroundBase = Color(hex: isDark ? 0x080D09 : 0xF4EDDF)

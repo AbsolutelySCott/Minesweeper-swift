@@ -76,8 +76,10 @@ final class GameModel {
     }
 
     private func reveal(at index: Int) {
+        let revealedBefore = game.revealedSafeCount
         guard game.reveal(at: index) else { return }
-        provideFeedbackForMove()
+        let newlyRevealed = max(0, game.revealedSafeCount - revealedBefore)
+        provideFeedbackForMove(newlyRevealed: newlyRevealed)
         recordResultIfNeeded()
     }
 
@@ -89,14 +91,20 @@ final class GameModel {
         }
     }
 
-    private func provideFeedbackForMove() {
+    private func provideFeedbackForMove(newlyRevealed: Int) {
         switch game.status {
         case .lost:
             Haptics.notify(.error)
         case .won:
             Haptics.notify(.success)
         default:
-            Haptics.impact(.soft, intensity: 0.75)
+            // A single flip gets a crisp tap; opening a whole area gets a
+            // slightly fuller bump.
+            if newlyRevealed >= 3 {
+                Haptics.impact(.medium, intensity: 0.85)
+            } else {
+                Haptics.impact(.light, intensity: 1)
+            }
         }
     }
 

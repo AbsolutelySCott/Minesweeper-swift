@@ -138,7 +138,8 @@ struct GameScreen: View {
                 isFlagMode: model.isFlagMode,
                 onExit: exitFullScreen,
                 onReset: { model.startNewGame() },
-                onToggleFlagMode: toggleFlagMode
+                onToggleFlagMode: toggleFlagMode,
+                onToggleOrientation: toggleFullScreenOrientation
             )
             .frame(maxWidth: isRegularWidth ? 760 : .infinity)
 
@@ -245,6 +246,11 @@ struct GameScreen: View {
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
             isFullScreen = false
         }
+    }
+
+    private func toggleFullScreenOrientation() {
+        Haptics.selection()
+        InterfaceOrientationController.toggleFullScreenOrientation()
     }
 
     private var boardWidth: CGFloat {

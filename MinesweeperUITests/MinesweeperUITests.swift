@@ -234,6 +234,47 @@ final class MinesweeperUITests: XCTestCase {
     }
 
     @MainActor
+    func testFullScreenOrientationToggle() throws {
+        try XCTSkipIf(
+            UIDevice.current.userInterfaceIdiom == .pad,
+            "The full-screen orientation switch is an iPhone affordance; iPad rotates natively."
+        )
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))
+
+        app.buttons["fullscreen-button"].tap()
+        let orientationButton = app.buttons["fullscreen-orientation"]
+        XCTAssertTrue(orientationButton.waitForExistence(timeout: 3))
+
+        let window = app.windows.firstMatch
+        let portrait = NSPredicate { _, _ in
+            let frame = window.frame
+            return frame.height > frame.width && frame.width > 0
+        }
+        expectation(for: portrait, evaluatedWith: window)
+        waitForExpectations(timeout: 3)
+
+        orientationButton.tap()
+        let landscape = NSPredicate { _, _ in
+            let frame = window.frame
+            return frame.width > frame.height && frame.height > 0
+        }
+        expectation(for: landscape, evaluatedWith: window)
+        waitForExpectations(timeout: 5)
+
+        XCTAssertTrue(app.buttons["fullscreen-exit"].isHittable)
+        XCTAssertTrue(app.buttons["fullscreen-flag-mode"].isHittable)
+        attachScreenshot(app, name: "20-fullscreen-landscape-toggle")
+
+        app.buttons["fullscreen-orientation"].tap()
+        expectation(for: portrait, evaluatedWith: window)
+        waitForExpectations(timeout: 5)
+
+        app.buttons["fullscreen-exit"].tap()
+        XCTAssertTrue(app.buttons["stats-button"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
     func testLossShowsResultAndRecordsStats() throws {
         let app = launchApp()
         XCTAssertTrue(app.staticTexts["扫雷"].waitForExistence(timeout: 6))

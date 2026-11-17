@@ -19,6 +19,7 @@ struct BoardView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(AppTheme.storageKey) private var themeRawValue = AppTheme.midnightGold.rawValue
 
     @State private var zoomScale: CGFloat = 1
     @GestureState private var pinchMagnification: CGFloat = 1
@@ -308,7 +309,19 @@ struct BoardView: View {
     }
 
     private func interactiveBoardGrid(geometry: BoardZoomGeometry) -> some View {
-        ZStack(alignment: .topLeading) {
+        let columns = game.configuration.columns
+        let rows = game.configuration.rows
+
+        return ZStack(alignment: .topLeading) {
+            BoardHiddenCanvas(
+                columns: columns,
+                rows: rows,
+                tile: geometry.tile,
+                spacing: geometry.gap,
+                themeToken: "\(themeRawValue)-\(colorScheme == .dark ? "dark" : "light")"
+            )
+            .equatable()
+
             BoardCanvas(
                 cells: game.cells,
                 configuration: game.configuration,
