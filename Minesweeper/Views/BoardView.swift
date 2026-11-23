@@ -24,10 +24,7 @@ struct BoardView: View {
     @State private var applicationAccessibilityEnabled = AccessibilitySettings.isApplicationAccessibilityEnabled
 
     @State private var zoomScale: CGFloat = 1
-    @GestureState private var pinchMagnification: CGFloat = 1
-
-    private let minimumZoom: CGFloat = 1
-    private let maximumZoom: CGFloat = 3
+    @State private var zoomResetID = UUID()
 
     private var cardShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
@@ -95,7 +92,7 @@ struct BoardView: View {
                     viewport: proxy.size,
                     edgeInset: edgeInset
                 )
-                boardViewport(layout: layout, viewport: proxy.size)
+                boardViewport(layout: layout)
             }
         }
     }
@@ -220,64 +217,36 @@ struct BoardView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func boardViewport(layout: BoardLayout, viewport: CGSize) -> some View {
-        let geometry = zoomedGeometry(layout: layout)
-        let previewScale = effectiveZoom / zoomScale
-        let content = interactiveBoardGrid(geometry: geometry)
-            .scaleEffect(previewScale, anchor: .center)
-            .padding(layout.inset)
-            .frame(
-                minWidth: viewport.width,
-                minHeight: viewport.height
-            )
-
-        return ScrollView([.horizontal, .vertical]) {
-            content
+    private func boardViewport(layout: BoardLayout) -> some View {
+        BoardZoomScrollView(
+            contentSize: layout.contentSize,
+            edgeInset: layout.inset,
+            boardID: game.id,
+            resetID: zoomResetID,
+            accessibilityHint: layout.isScrollable
+                ? "棋盘较大，可以拖动查看，也可以双指缩放。轻点方格翻开，长按方格插旗。"
+                : "可以双指缩放棋盘。轻点方格翻开，长按方格插旗。",
+            onZoomChange: { zoomScale = $0 }
+        ) { renderScale in
+            interactiveBoardGrid(geometry: zoomedGeometry(layout: layout, scale: renderScale))
         }
-        .id(zoomScale)
-        .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize)
-        .defaultScrollAnchor(.center)
-        .simultaneousGesture(zoomGesture)
         .onChange(of: game.id) { _, _ in
             zoomScale = 1
         }
-        .accessibilityIdentifier("board")
-        .accessibilityLabel("扫雷棋盘")
-        .accessibilityHint(
-            layout.isScrollable
-                ? "棋盘较大，可以拖动查看，也可以双指缩放。轻点方格翻开，长按方格插旗。"
-                : "可以双指缩放棋盘。轻点方格翻开，长按方格插旗。"
-        )
-    }
-
-    private var effectiveZoom: CGFloat {
-        min(max(zoomScale * pinchMagnification, minimumZoom), maximumZoom)
-    }
-
-    private var zoomGesture: some Gesture {
-        MagnifyGesture(minimumScaleDelta: 0.01)
-            .updating($pinchMagnification) { value, state, _ in
-                state = value.magnification
-            }
-            .onEnded { value in
-                zoomScale = min(max(zoomScale * value.magnification, minimumZoom), maximumZoom)
-            }
     }
 
     @ViewBuilder
     private var zoomResetButton: some View {
-        if effectiveZoom > 1.01 {
+        if zoomScale > 1.01 {
             Button {
                 Haptics.selection()
-                withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) {
-                    zoomScale = 1
-                }
+                zoomScale = 1
+                zoomResetID = UUID()
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 9, weight: .bold))
-                    Text("\(Int((effectiveZoom * 100).rounded()))%")
+                    Text("\(Int((zoomScale * 100).rounded()))%")
                         .font(.gameMono(10, weight: .bold))
                 }
                 .foregroundStyle(palette.boardText.opacity(0.9))
@@ -297,15 +266,14 @@ struct BoardView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel("重置缩放")
-            .accessibilityValue("\(Int((effectiveZoom * 100).rounded()))%")
+            .accessibilityValue("\(Int((zoomScale * 100).rounded()))%")
             .accessibilityHint("轻点恢复适应棋盘大小")
             .accessibilityIdentifier("zoom-reset")
             .transition(.scale(scale: 0.9).combined(with: .opacity))
         }
     }
 
-    private func zoomedGeometry(layout: BoardLayout) -> BoardZoomGeometry {
-        let scale = zoomScale
+    private func zoomedGeometry(layout: BoardLayout, scale: CGFloat) -> BoardZoomGeometry {
         let tile = layout.tile * scale
         let gap = layout.gap * scale
         let columns = game.configuration.columns

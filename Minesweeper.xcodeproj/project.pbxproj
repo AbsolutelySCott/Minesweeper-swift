@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04C1AD51625334E27E565105 /* BoardZoomScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB825A6CD405DA9CD50DA662 /* BoardZoomScrollView.swift */; };
 		1110B31BB36B0761511A9B2D /* InterfaceOrientationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FDA5F3F04CF88EB33402A4 /* InterfaceOrientationController.swift */; };
 		16406EC59D47C6598DAC28F0 /* LandscapeSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31B80EBD381AAE74CC65E04 /* LandscapeSidebar.swift */; };
 		2739B7576AC07FA8F1940FAF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B00F1468E186BF08A63AD70 /* Theme.swift */; };
@@ -92,6 +93,7 @@
 		EA22C5965DC9CA54118F90FA /* GameScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScreen.swift; sourceTree = "<group>"; };
 		F79CC50D4EEB030348FEE522 /* BoardConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardConfiguration.swift; sourceTree = "<group>"; };
 		FA46CAFABA2363E215638FB3 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		FB825A6CD405DA9CD50DA662 /* BoardZoomScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardZoomScrollView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -102,6 +104,7 @@
 				ACEC09A7D5D1C8BEAB6B716F /* BoardCanvas.swift */,
 				E4E85CCDA6F64571F5DAD5A7 /* BoardInteractionLayer.swift */,
 				59C6F872FCF8CD62056C5CF2 /* BoardView.swift */,
+				FB825A6CD405DA9CD50DA662 /* BoardZoomScrollView.swift */,
 				7C03029163EC65DB4D85732F /* DifficultySelector.swift */,
 				7D6EBEC151E626EC23200B0B /* FullScreenHUD.swift */,
 				0DB4830FDB8E15CF3C0BF1C1 /* GameResultOverlay.swift */,
@@ -348,6 +351,7 @@
 				885F0F4290D98E728CC0CC88 /* BoardConfiguration.swift in Sources */,
 				69735625B0BAF98DFFCCE273 /* BoardInteractionLayer.swift in Sources */,
 				8653743C5045F7284FCD18D5 /* BoardView.swift in Sources */,
+				04C1AD51625334E27E565105 /* BoardZoomScrollView.swift in Sources */,
 				8F8E61D1C306A4A0C807956F /* Cell.swift in Sources */,
 				3CF826E49D881306255DC7A1 /* Components.swift in Sources */,
 				CADA4DDA2BF75402C9A98113 /* DifficultySelector.swift in Sources */,
@@ -425,7 +429,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -520,7 +524,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;

@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class MinesweeperUITests: XCTestCase {
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
@@ -190,6 +191,78 @@ final class MinesweeperUITests: XCTestCase {
 
         reset.tap()
         XCTAssertTrue(reset.waitForNonExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testPinchKeepsOffCenterTileUnderFingers() throws {
+        let app = launchApp()
+        let anchor = tile(in: app, row: 2, column: 2)
+        XCTAssertTrue(anchor.waitForExistence(timeout: 6))
+
+        assertPinchKeepsPosition(anchor, scale: 1.8)
+        assertPinchKeepsPosition(anchor, scale: 1.25)
+        assertPinchKeepsPosition(anchor, scale: 0.7)
+        XCTAssertEqual(anchor.value as? String, "未翻开", "Pinching must not reveal or flag a cell.")
+
+        let reset = app.buttons["zoom-reset"]
+        XCTAssertTrue(reset.waitForExistence(timeout: 3))
+        reset.tap()
+        XCTAssertTrue(reset.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(tile(in: app, row: 0, column: 0).isHittable)
+        XCTAssertTrue(tile(in: app, row: 8, column: 8).isHittable)
+
+        let board = app.scrollViews["board"]
+        board.pinch(withScale: 4, velocity: 2)
+        XCTAssertEqual(reset.value as? String, "300%")
+        board.pinch(withScale: 0.2, velocity: -2)
+        XCTAssertTrue(reset.waitForNonExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testPinchKeepsPositionAfterScrollingExpertBoard() throws {
+        let app = launchApp()
+        app.buttons["difficulty-expert"].tap()
+        let board = app.scrollViews["board"]
+        XCTAssertTrue(board.waitForExistence(timeout: 3))
+        // XCTest needs more than a 20-point tile to synthesize two touches.
+        board.pinch(withScale: 2, velocity: 1)
+        board.swipeLeft()
+
+        // Choose a tile away from the viewport center and its clipped edges.
+        let frame = board.frame
+        let visibleTiles = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'tile-7-'"))
+            .allElementsBoundByIndex
+        let anchor = try XCTUnwrap(visibleTiles.first {
+            $0.frame.midX > frame.minX + frame.width * 0.25
+                && $0.frame.midX < frame.minX + frame.width * 0.4
+                && $0.isHittable
+        })
+        assertPinchKeepsPosition(anchor, scale: 1.3)
+        XCTAssertEqual(anchor.value as? String, "未翻开")
+
+        app.buttons["face-button"].tap()
+        XCTAssertTrue(app.buttons["zoom-reset"].waitForNonExistence(timeout: 3))
+        XCTAssertTrue(tile(in: app, row: 7, column: 15).isHittable)
+    }
+
+    @MainActor
+    private func assertPinchKeepsPosition(
+        _ anchor: XCUIElement,
+        scale: CGFloat,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let before = anchor.frame
+        anchor.pinch(withScale: scale, velocity: scale > 1 ? 1 : -1)
+        let after = anchor.frame
+        if scale > 1 {
+            XCTAssertGreaterThan(after.width, before.width * 1.1, file: file, line: line)
+        } else {
+            XCTAssertLessThan(after.width, before.width * 0.9, file: file, line: line)
+        }
+        XCTAssertEqual(after.midX, before.midX, accuracy: 8, "The pinch's horizontal focal point must stay fixed.", file: file, line: line)
+        XCTAssertEqual(after.midY, before.midY, accuracy: 8, "The pinch's vertical focal point must stay fixed.", file: file, line: line)
     }
 
     @MainActor
