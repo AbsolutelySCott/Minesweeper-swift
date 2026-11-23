@@ -2,7 +2,7 @@ name: Minesweeper
 options:
   bundleIdPrefix: com.scott
   deploymentTarget:
-    iOS: "27.0"
+    iOS: "26.0"
   xcodeVersion: "27.2"
   createIntermediateGroups: true
   developmentLanguage: zh-Hans
@@ -23,7 +23,7 @@ settings:
     GCC_WARN_UNUSED_FUNCTION: YES
     GCC_WARN_UNUSED_VARIABLE: YES
     MARKETING_VERSION: "1.4"
-    CURRENT_PROJECT_VERSION: "6"
+    CURRENT_PROJECT_VERSION: "7"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     CODE_SIGNING_ALLOWED: YES
@@ -32,7 +32,7 @@ targets:
   Minesweeper:
     type: application
     platform: iOS
-    deploymentTarget: "27.0"
+    deploymentTarget: "26.0"
     sources:
       - path: Minesweeper
         excludes:
@@ -79,7 +79,7 @@ targets:
   MinesweeperTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "27.0"
+    deploymentTarget: "26.0"
     sources:
       - path: MinesweeperTests
     dependencies:
@@ -94,7 +94,7 @@ targets:
   MinesweeperUITests:
     type: bundle.ui-testing
     platform: iOS
-    deploymentTarget: "27.0"
+    deploymentTarget: "26.0"
     sources:
       - path: MinesweeperUITests
     dependencies:

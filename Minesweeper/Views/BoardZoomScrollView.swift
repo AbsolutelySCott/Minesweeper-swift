@@ -1,8 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// UIScrollView keeps the content under the moving pinch midpoint, including
-/// when another pinch starts after panning. Its identity stays stable on release.
+/// Keeps the board under the moving pinch midpoint inside a stable scroll view.
 struct BoardZoomScrollView<Content: View>: UIViewControllerRepresentable {
     let contentSize: CGSize
     let edgeInset: CGFloat
@@ -36,7 +35,7 @@ struct BoardZoomScrollView<Content: View>: UIViewControllerRepresentable {
 }
 
 @MainActor
-final class BoardZoomController: UIViewController, UIScrollViewDelegate {
+final class BoardZoomController: UIViewController, UIGestureRecognizerDelegate {
     private let scrollView = UIScrollView()
     private let zoomSurface = UIView()
     private let host = UIHostingController(rootView: AnyView(EmptyView()))
@@ -49,6 +48,11 @@ final class BoardZoomController: UIViewController, UIScrollViewDelegate {
     private var laidOutInset: CGFloat = 0
     private var needsReset = true
     private var renderScale: CGFloat = 1
+    private var zoomScale: CGFloat = 1
+    private var pinchStartScale: CGFloat = 1
+    private var pinchAnchor: CGPoint = .zero
+    private var isPinching = false
+    private lazy var pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
     private var makeContent: ((CGFloat) -> AnyView)?
     private var onZoomChange: ((CGFloat) -> Void)?
 
@@ -56,16 +60,14 @@ final class BoardZoomController: UIViewController, UIScrollViewDelegate {
         super.viewDidLoad()
         view.backgroundColor = .clear
         scrollView.backgroundColor = .clear
-        scrollView.delegate = self
-        scrollView.minimumZoomScale = 1
-        scrollView.maximumZoomScale = 3
-        scrollView.bouncesZoom = false
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.contentInsetAdjustmentBehavior = .never
         scrollView.delaysContentTouches = false
         scrollView.accessibilityIdentifier = "board"
         scrollView.accessibilityLabel = "扫雷棋盘"
+        pinch.delegate = self
+        scrollView.addGestureRecognizer(pinch)
         view.addSubview(scrollView)
         scrollView.addSubview(zoomSurface)
 
@@ -118,7 +120,7 @@ final class BoardZoomController: UIViewController, UIScrollViewDelegate {
 
         scrollView.frame = view.bounds
         if needsReset {
-            scrollView.setZoomScale(1, animated: false)
+            zoomScale = 1
             renderScale = 1
             host.rootView = makeContent?(renderScale) ?? AnyView(EmptyView())
         }
@@ -129,20 +131,16 @@ final class BoardZoomController: UIViewController, UIScrollViewDelegate {
             width: max(viewport.width, contentSize.width + 2 * edgeInset),
             height: max(viewport.height, contentSize.height + 2 * edgeInset)
         )
-        let scale = scrollView.zoomScale
         zoomSurface.bounds = CGRect(origin: .zero, size: surface)
-        zoomSurface.center = CGPoint(x: surface.width * scale / 2, y: surface.height * scale / 2)
-        scrollView.contentSize = CGSize(width: surface.width * scale, height: surface.height * scale)
+        layoutZoomSurface()
         layoutHostedBoard()
 
         let origin = boardOrigin(surface: surface, board: contentSize)
         let target = needsReset ? CGPoint(x: 0.5, y: 0.5) : anchor
-        scrollView.contentOffset = CGPoint(
-            x: min(max(0, (origin.x + target.x * contentSize.width) * scale - viewport.width / 2),
-                   max(0, scrollView.contentSize.width - viewport.width)),
-            y: min(max(0, (origin.y + target.y * contentSize.height) * scale - viewport.height / 2),
-                   max(0, scrollView.contentSize.height - viewport.height))
-        )
+        setContentOffset(CGPoint(
+            x: (origin.x + target.x * contentSize.width) * zoomScale - viewport.width / 2,
+            y: (origin.y + target.y * contentSize.height) * zoomScale - viewport.height / 2
+        ))
 
         laidOutViewport = viewport
         laidOutContentSize = contentSize
@@ -150,22 +148,65 @@ final class BoardZoomController: UIViewController, UIScrollViewDelegate {
         needsReset = false
     }
 
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        zoomSurface
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        gestureRecognizer === pinch && otherGestureRecognizer === scrollView.panGestureRecognizer
     }
 
-    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            isPinching = true
+            scrollView.panGestureRecognizer.isEnabled = false
+            scrollView.setContentOffset(scrollView.contentOffset, animated: false)
+            pinchStartScale = zoomScale
+            pinchAnchor = zoomSurface.convert(gesture.location(in: scrollView), from: scrollView)
+        case .changed:
+            guard isPinching else { return }
+            let midpoint = gesture.location(in: view)
+            zoomScale = min(3, max(1, pinchStartScale * gesture.scale))
+            layoutZoomSurface()
+            // Map the original board point back to the current finger midpoint.
+            setContentOffset(CGPoint(
+                x: pinchAnchor.x * zoomScale - midpoint.x,
+                y: pinchAnchor.y * zoomScale - midpoint.y
+            ))
+        case .ended, .cancelled, .failed:
+            guard isPinching else { return }
+            isPinching = false
+            scrollView.panGestureRecognizer.isEnabled = true
+            finishZoom()
+        default:
+            break
+        }
+    }
+
+    private func finishZoom() {
         // Redraw the Canvas once at the final resolution. The inverse transform
         // keeps its board coordinates and the scroll offset unchanged.
-        renderScale = scale
-        host.rootView = makeContent?(scale) ?? AnyView(EmptyView())
+        renderScale = zoomScale
+        host.rootView = makeContent?(renderScale) ?? AnyView(EmptyView())
         layoutHostedBoard()
-        // A programmatic reset can also reach this delegate during a SwiftUI
-        // update; defer the state notification until that update is complete.
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.onZoomChange?(self.scrollView.zoomScale)
+            self.onZoomChange?(self.zoomScale)
         }
+    }
+
+    private func layoutZoomSurface() {
+        let size = zoomSurface.bounds.size
+        zoomSurface.transform = CGAffineTransform(scaleX: zoomScale, y: zoomScale)
+        zoomSurface.center = CGPoint(x: size.width * zoomScale / 2, y: size.height * zoomScale / 2)
+        scrollView.contentSize = CGSize(width: size.width * zoomScale, height: size.height * zoomScale)
+    }
+
+    private func setContentOffset(_ offset: CGPoint) {
+        scrollView.contentOffset = CGPoint(
+            x: min(max(0, offset.x), max(0, scrollView.contentSize.width - scrollView.bounds.width)),
+            y: min(max(0, offset.y), max(0, scrollView.contentSize.height - scrollView.bounds.height))
+        )
     }
 
     private func layoutHostedBoard() {

@@ -21,7 +21,7 @@ struct BoardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppTheme.storageKey) private var themeRawValue = AppTheme.midnightGold.rawValue
-    @State private var applicationAccessibilityEnabled = AccessibilitySettings.isApplicationAccessibilityEnabled
+    @State private var applicationAccessibilityEnabled = BoardAccessibilityObserver.needsGrid
 
     @State private var zoomScale: CGFloat = 1
     @State private var zoomResetID = UUID()
@@ -46,13 +46,7 @@ struct BoardView: View {
                 .zIndex(2)
             }
         }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: AccessibilitySettings.applicationAccessibilityEnabledDidChangeNotification
-            )
-        ) { _ in
-            applicationAccessibilityEnabled = AccessibilitySettings.isApplicationAccessibilityEnabled
-        }
+        .modifier(BoardAccessibilityObserver(isEnabled: $applicationAccessibilityEnabled))
         .background(boardSurface)
         .clipShape(cardShape)
         .overlay {
@@ -306,11 +300,9 @@ struct BoardView: View {
                 spacing: geometry.gap
             )
 
-            // Building 480 accessible cells is only worthwhile when an
-            // assistive technology is actually consuming the AX tree. iOS
-            // tells us when that changes, including when VoiceOver, Switch
-            // Control, Voice Control, keyboard access, or test automation is
-            // attached.
+            // iOS 27 reports when an assistive technology needs the AX tree.
+            // On iOS 26, retain the grid so every accessibility service and
+            // test automation can still reach the board.
             if applicationAccessibilityEnabled {
                 BoardAccessibilityGrid(
                     cells: game.cells,
@@ -409,6 +401,32 @@ struct BoardView: View {
             "全部清理完成"
         case .lost:
             "踩到地雷了"
+        }
+    }
+}
+
+private struct BoardAccessibilityObserver: ViewModifier {
+    @Binding var isEnabled: Bool
+
+    static var needsGrid: Bool {
+        if #available(iOS 27.0, *) {
+            return AccessibilitySettings.isApplicationAccessibilityEnabled
+        }
+        return true
+    }
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 27.0, *) {
+            content.onReceive(
+                NotificationCenter.default.publisher(
+                    for: AccessibilitySettings.applicationAccessibilityEnabledDidChangeNotification
+                )
+            ) { _ in
+                isEnabled = Self.needsGrid
+            }
+        } else {
+            content
         }
     }
 }
